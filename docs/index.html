@@ -1,0 +1,458 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#b8b5af" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#1a1815" media="(prefers-color-scheme: dark)" />
+
+    <!-- iOS Safari UI tinting -->
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="gobreaker" />
+    <title>gobreaker - Breaking Change Detection for Go APIs</title>
+    <link
+      rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css"
+    />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <div class="terminal-window">
+      <div class="terminal-header">
+        <div class="terminal-controls">
+          <div class="control close"></div>
+          <div class="control minimize"></div>
+          <div class="control maximize"></div>
+        </div>
+        <div class="terminal-tabs">
+          <div class="tab active" data-tab="about">About</div>
+          <div class="tab" data-tab="install">Install</div>
+          <div class="tab" data-tab="usage">Usage</div>
+          <div class="tab" data-tab="features">Features</div>
+          <div class="tab" data-tab="examples">Examples</div>
+          <div class="tab" data-tab="changelog">Changelog</div>
+        </div>
+      </div>
+
+      <div class="terminal-content">
+        <div class="tab-content active" id="about">
+          <div class="ascii-header">
+            <pre>
+   __ _  ___  ___ _ __ ___  __ _| | _____ _ __
+  / _` |/ _ \| _ \ '__/ _ \/ _` | |/ / _ \ '__|
+ | (_| | (_) |  _/ | |  __/ (_| |   <  __/ |
+  \__, |\___/|_| |_|  \___|\__,_|_|\_\___|_|
+  |___/
+</pre
+            >
+          </div>
+
+          <div class="prompt">
+            <span class="prompt-symbol">gobreaker@v0.1.0:~$</span> <span class="command">gobreaker --help</span>
+          </div>
+
+          <div class="output">
+            <pre>
+gobreaker - Breaking Change Detection for Go APIs
+
+Gobreaker is a Go tool that helps you detect breaking changes in Go APIs using
+the golang.org/x/exp/apidiff package. It analyzes Go packages and reports
+incompatible changes between versions, helping you maintain API stability and
+follow semantic versioning principles.
+
+USAGE:
+    gobreaker [options] [package] [oldversion] [newversion]
+
+For more information, see other tabs or visit:
+https://github.com/flaticols/gobreaker</pre
+            >
+          </div>
+
+          <div class="prompt">
+            <span class="prompt-symbol">gobreaker@v0.1.0:~$</span>
+            <span class="command">gobreaker github.com/example/mylib v1.0.0 v1.1.0</span>
+          </div>
+
+          <div class="output">
+            <pre><span class="success">•</span> analyzing package: github.com/example/mylib
+<span class="success">•</span> comparing v1.0.0 -> v1.1.0
+<span class="warning">•</span> found <span class="error">2 incompatible</span> changes
+<span class="success">•</span> found <span class="success">5 compatible</span> changes
+
+Incompatible changes:
+  - Removed: func OldFunction()
+  - Changed: type Config field Name: changed from string to []string
+
+<span class="success">•</span> report saved to breaking-changes.txt</pre>
+          </div>
+        </div>
+
+        <div class="tab-content" id="install">
+          <div class="section-header">Installation</div>
+
+          <div class="prompt">
+            <span class="prompt-symbol">gobreaker@v0.1.0:~$</span>
+            <span class="comment"># Install using Homebrew</span>
+          </div>
+          <div class="prompt">
+            <span class="prompt-symbol">gobreaker@v0.1.0:~$</span>
+            <span class="command">brew tap flaticols/apps</span>
+          </div>
+          <div class="prompt">
+            <span class="prompt-symbol">gobreaker@v0.1.0:~$</span>
+            <span class="command">brew install flaticols/apps/gobreaker</span>
+          </div>
+
+          <div class="output">
+            <pre><span class="success">•</span> Tapping flaticols/apps
+<span class="success">•</span> Installing gobreaker from flaticols/apps
+<span class="success">•</span> gobreaker 0.1.0 is installed</pre>
+          </div>
+
+          <div class="prompt">
+            <span class="prompt-symbol">gobreaker@v0.1.0:~$</span> <span class="comment"># Or install using Go</span>
+          </div>
+          <div class="prompt">
+            <span class="prompt-symbol">gobreaker@v0.1.0:~$</span>
+            <span class="command">go install github.com/flaticols/gobreaker@latest</span>
+          </div>
+
+          <div class="output">
+            <pre>go: downloading github.com/flaticols/gobreaker v0.1.0
+<span class="success">•</span> Successfully installed gobreaker</pre>
+          </div>
+
+          <div class="prompt">
+            <span class="prompt-symbol">gobreaker@v0.1.0:~$</span> <span class="comment"># Or build from source</span>
+          </div>
+          <div class="prompt">
+            <span class="prompt-symbol">gobreaker@v0.1.0:~$</span>
+            <span class="command">git clone https://github.com/flaticols/gobreaker.git</span>
+          </div>
+          <div class="prompt">
+            <span class="prompt-symbol">gobreaker@v0.1.0:~$</span> <span class="command">cd gobreaker</span>
+          </div>
+          <div class="prompt">
+            <span class="prompt-symbol">gobreaker@v0.1.0:~$</span>
+            <span class="command">go build -o gobreaker ./cmd/gobreaker</span>
+          </div>
+
+          <div class="prompt">
+            <span class="prompt-symbol">gobreaker@v0.1.0:~$</span> <span class="comment"># Download binary releases from:</span>
+          </div>
+          <div class="output">
+            <pre><a href="https://github.com/flaticols/gobreaker/releases">https://github.com/flaticols/gobreaker/releases</a></pre>
+          </div>
+        </div>
+
+        <div class="tab-content" id="usage">
+          <div class="section-header">Usage</div>
+
+          <div class="prompt">
+            <span class="prompt-symbol">gobreaker@v0.1.0:~$</span> <span class="command">gobreaker --help</span>
+          </div>
+
+          <div class="output">
+            <pre>
+USAGE:
+    gobreaker [options] [package] [oldversion] [newversion]
+
+OPTIONS:
+    --output, -o     Output format (text, json, markdown) (default: text)
+    --file, -f       Write report to file instead of stdout
+    --verbose, -v    Show all changes including compatible ones
+    --quiet, -q      Only show incompatible changes
+    --help, -h       Show help message
+    --version        Print version information
+
+EXIT CODES:
+    0 - No breaking changes detected
+    1 - Breaking changes found
+    2 - Error occurred during analysis
+
+EXAMPLES:
+    # Compare two versions of a package
+    gobreaker github.com/example/mylib v1.0.0 v2.0.0
+
+    # Analyze current directory package
+    gobreaker . v1.0.0 HEAD
+
+    # Compare specific git commits
+    gobreaker ./pkg/api abc123 def456
+
+    # Output as JSON
+    gobreaker --output json github.com/example/api v1.0.0 v1.1.0
+
+    # Save report to file
+    gobreaker --file report.md --output markdown ./pkg v1.0.0 v2.0.0</pre
+            >
+          </div>
+        </div>
+
+        <div class="tab-content" id="features">
+          <div class="section-header">Features</div>
+
+          <div class="feature-list">
+            <div class="feature-item">
+              <span class="feature-icon">▸</span>
+              <span class="feature-name">API Analysis</span>
+              <span class="feature-desc"
+                >Powered by golang.org/x/exp/apidiff for accurate breaking change detection</span
+              >
+            </div>
+
+            <div class="feature-item">
+              <span class="feature-icon">▸</span>
+              <span class="feature-name">Version Compare</span>
+              <span class="feature-desc"
+                >Compare any two versions, commits, or branches of your Go packages</span
+              >
+            </div>
+
+            <div class="feature-item">
+              <span class="feature-icon">▸</span>
+              <span class="feature-name">Breaking Changes</span>
+              <span class="feature-desc"
+                >Identifies removed functions, changed signatures, and incompatible changes</span
+              >
+            </div>
+
+            <div class="feature-item">
+              <span class="feature-icon">▸</span>
+              <span class="feature-name">Safe Changes</span>
+              <span class="feature-desc"
+                >Reports compatible additions and improvements to your API</span
+              >
+            </div>
+
+            <div class="feature-item">
+              <span class="feature-icon">▸</span>
+              <span class="feature-name">Output Formats</span>
+              <span class="feature-desc">Generate reports in text, JSON, or Markdown formats</span>
+            </div>
+
+            <div class="feature-item">
+              <span class="feature-icon">▸</span>
+              <span class="feature-name">Clear Reports</span>
+              <span class="feature-desc"
+                >Well-formatted output with proper indentation and categorization</span
+              >
+            </div>
+
+            <div class="feature-item">
+              <span class="feature-icon">▸</span>
+              <span class="feature-name">Git Support</span>
+              <span class="feature-desc"
+                >Built-in support for analyzing changes between git commits and tags</span
+              >
+            </div>
+
+            <div class="feature-item">
+              <span class="feature-icon">▸</span>
+              <span class="feature-name">CI/CD Ready</span>
+              <span class="feature-desc"
+                >Exit codes and structured output perfect for automated pipelines</span
+              >
+            </div>
+          </div>
+        </div>
+
+        <div class="tab-content" id="examples">
+          <div class="section-header">Examples</div>
+
+          <div class="example-section">
+            <div class="example-title">## Basic Package Analysis</div>
+            <div class="prompt">
+              <span class="prompt-symbol">gobreaker@v0.1.0:~$</span>
+              <span class="command">gobreaker github.com/example/mylib v1.0.0 v1.1.0</span>
+            </div>
+            <div class="output">
+              <pre><span class="success">•</span> analyzing package: github.com/example/mylib
+<span class="success">•</span> comparing v1.0.0 -> v1.1.0
+<span class="success">•</span> found 0 incompatible changes
+<span class="success">•</span> found 3 compatible changes
+
+Compatible changes:
+  + Added: func NewHelper(config Config) (*Helper, error)
+  + Added: method (*Client) GetTimeout() time.Duration
+  + Added: const DefaultTimeout
+
+<span class="success">•</span> no breaking changes detected</pre>
+            </div>
+          </div>
+
+          <div class="example-section">
+            <div class="example-title">## Detecting Breaking Changes</div>
+            <div class="prompt">
+              <span class="prompt-symbol">gobreaker@v0.1.0:~$</span>
+              <span class="command">gobreaker github.com/example/mylib v1.0.0 v2.0.0</span>
+            </div>
+            <div class="output">
+              <pre><span class="success">•</span> analyzing package: github.com/example/mylib
+<span class="success">•</span> comparing v1.0.0 -> v2.0.0
+<span class="warning">•</span> found <span class="error">3 incompatible</span> changes
+<span class="success">•</span> found <span class="success">5 compatible</span> changes
+
+Incompatible changes:
+  - Removed: func DeprecatedFunction(s string) error
+  - Changed: func Process(input string) error
+      to: func Process(ctx context.Context, input string) error
+  - Changed: type Config field Timeout: changed from int to time.Duration
+
+Compatible changes:
+  + Added: func ProcessWithContext(ctx context.Context, input string) error
+  + Added: method (*Client) Close() error
+  + Added: field Config.MaxRetries int
+  + Added: var ErrTimeout = errors.New("operation timed out")
+  + Added: interface Processor
+
+<span class="error">•</span> breaking changes detected (exit code: 1)</pre>
+            </div>
+          </div>
+
+          <div class="example-section">
+            <div class="example-title">## JSON Output</div>
+            <div class="prompt">
+              <span class="prompt-symbol">gobreaker@v0.1.0:~$</span>
+              <span class="command"
+                >gobreaker --output json github.com/example/api v1.0.0 v1.1.0</span
+              >
+            </div>
+            <div class="output">
+              <pre>
+{
+  "package": "github.com/example/api",
+  "old_version": "v1.0.0",
+  "new_version": "v1.1.0",
+  "incompatible_changes": [],
+  "compatible_changes": [
+    {
+      "type": "added",
+      "object": "func",
+      "name": "ValidateRequest",
+      "detail": "func ValidateRequest(r *Request) error"
+    }
+  ],
+  "has_breaking_changes": false
+}</pre
+              >
+            </div>
+          </div>
+
+          <div class="example-section">
+            <div class="example-title">## CI/CD Integration</div>
+            <div class="prompt">
+              <span class="prompt-symbol">gobreaker@v0.1.0:~$</span>
+              <span class="comment"># In your CI/CD pipeline</span>
+            </div>
+            <div class="prompt">
+              <span class="prompt-symbol">gobreaker@v0.1.0:~$</span>
+              <span class="command">gobreaker ./api v1.5.0 HEAD || {</span>
+            </div>
+            <div class="prompt">
+              <span class="prompt-symbol">></span>
+              <span class="command">
+                echo "Breaking changes detected! Major version bump required."</span
+              >
+            </div>
+            <div class="prompt">
+              <span class="prompt-symbol">></span> <span class="command"> exit 1</span>
+            </div>
+            <div class="prompt">
+              <span class="prompt-symbol">></span> <span class="command">}</span>
+            </div>
+            <div class="output">
+              <pre><span class="success">•</span> analyzing package: ./api
+<span class="success">•</span> comparing v1.5.0 -> HEAD
+<span class="success">•</span> found 0 incompatible changes
+<span class="success">•</span> found 2 compatible changes
+<span class="success">•</span> no breaking changes detected</pre>
+            </div>
+          </div>
+        </div>
+
+        <div class="tab-content" id="changelog">
+          <div class="section-header">Changelog</div>
+
+          <div class="changelog-entry">
+            <div class="changelog-version">
+              <span class="version-tag">v0.1.0</span>
+              <span class="version-date">Initial Release</span>
+            </div>
+            <div class="changelog-changes">
+              <div class="change-type added">Added</div>
+              <ul>
+                <li>Core breaking change detection using golang.org/x/exp/apidiff</li>
+                <li>Support for comparing Go packages between versions, commits, or branches</li>
+                <li>Multiple output formats: text, JSON, and Markdown</li>
+                <li>Git integration for analyzing repository changes</li>
+                <li>Detailed reporting of both compatible and incompatible changes</li>
+                <li>CLI with comprehensive flags for different use cases</li>
+                <li>Exit codes for CI/CD integration</li>
+                <li>Custom diff report writer with proper indentation</li>
+              </ul>
+            </div>
+          </div>
+
+          <div class="changelog-footer">
+            <p>
+              For the latest updates, visit the
+              <a href="https://github.com/flaticols/gobreaker">GitHub repository</a>
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <div class="terminal-footer">
+        <div class="footer-left">
+          <a href="https://github.com/flaticols/gobreaker">
+            <i class="fab fa-github"></i> GitHub
+          </a>
+          <a href="https://github.com/flaticols/gobreaker/issues">
+            <i class="fas fa-bug"></i> Issues
+          </a>
+        </div>
+        <div class="footer-right">
+          gobreaker © 2025 by <a href="https://github.com/flaticols">Denis Panfilov</a> | MIT
+          License
+        </div>
+      </div>
+    </div>
+
+    <script>
+      // Tab switching functionality
+      document.addEventListener("DOMContentLoaded", function () {
+        const tabs = document.querySelectorAll(".tab");
+        const contents = document.querySelectorAll(".tab-content");
+
+        tabs.forEach((tab) => {
+          tab.addEventListener("click", () => {
+            // Remove active class from all tabs and contents
+            tabs.forEach((t) => t.classList.remove("active"));
+            contents.forEach((c) => c.classList.remove("active"));
+
+            // Add active class to clicked tab
+            tab.classList.add("active");
+
+            // Show corresponding content
+            const tabName = tab.getAttribute("data-tab");
+            document.getElementById(tabName).classList.add("active");
+          });
+        });
+
+        // Terminal typing effect for commands (optional)
+        const commands = document.querySelectorAll(".command");
+        commands.forEach((cmd) => {
+          cmd.style.opacity = "1";
+        });
+      });
+    </script>
+  </body>
+</html>
