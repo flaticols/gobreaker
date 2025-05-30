@@ -2,20 +2,23 @@ package main
 
 import (
 	"fmt"
-	"github.com/flaticols/gobreaker/internal/git"
 	"os"
 	"runtime/debug"
 
+	"github.com/flaticols/gobreaker/internal/git"
 	"github.com/jessevdk/go-flags"
 )
 
 type programOptions struct {
+	//nolint:golines
 	RepoPath string `short:"r" long:"repo" description:"Path to git repository (default: current directory)"`
-	OldRef   string `short:"o" long:"old" description:"Old reference (branch, tag, or commit) to compare from, or 'latest' to compare latest against HEAD" required:"true"`
-	NewRef   string `short:"n" long:"new" description:"New reference (branch, tag, or commit) to compare to" default:"HEAD"`
-	Output   string `short:"f" long:"format" description:"Output format (text, json, markdown)" default:"text" choice:"text"` //nolint:golines
-	Quite    bool   `short:"q" long:"quiet" description:"Suppress output"`
-	Version  bool   `short:"v" long:"version" description:"Print version information and exit"`
+	//nolint:golines
+	OldRef string `short:"o" long:"old" description:"Old reference (branch, tag, or commit) to compare from, or 'latest' to compare latest against HEAD" required:"true"`
+	NewRef string `short:"n" long:"new" description:"New reference (branch, tag, or commit) to compare to" default:"HEAD"`
+	//nolint:golines
+	Output  string `short:"f" long:"format" description:"Output format (text, json, markdown)" default:"text" choice:"text"`
+	Quite   bool   `short:"q" long:"quiet" description:"Suppress output"`
+	Version bool   `short:"v" long:"version" description:"Print version information and exit"`
 }
 
 func main() {
