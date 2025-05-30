@@ -68,7 +68,7 @@ incompatible changes between versions, helping you maintain API stability and
 follow semantic versioning principles.
 
 USAGE:
-    gobreaker [options] [package] [oldversion] [newversion]
+    gobreaker --old [ref] [OPTIONS]
 
 For more information, see other tabs or visit:
 https://github.com/flaticols/gobreaker</pre
@@ -77,11 +77,11 @@ https://github.com/flaticols/gobreaker</pre
 
           <div class="prompt">
             <span class="prompt-symbol">gobreaker@v0.1.0:~$</span>
-            <span class="command">gobreaker github.com/example/mylib v1.0.0 v1.1.0</span>
+            <span class="command">gobreaker --old v1.0.0 --new v1.1.0</span>
           </div>
 
           <div class="output">
-            <pre><span class="success">•</span> analyzing package: github.com/example/mylib
+            <pre><span class="success">•</span> analyzing repository: ./
 <span class="success">•</span> comparing v1.0.0 -> v1.1.0
 <span class="warning">•</span> found <span class="error">2 incompatible</span> changes
 <span class="success">•</span> found <span class="success">5 compatible</span> changes
@@ -90,7 +90,7 @@ Incompatible changes:
   - Removed: func OldFunction()
   - Changed: type Config field Name: changed from string to []string
 
-<span class="success">•</span> report saved to breaking-changes.txt</pre>
+<span class="error">•</span> breaking changes detected (exit code: 1)</pre>
           </div>
         </div>
 
@@ -162,36 +162,37 @@ Incompatible changes:
           <div class="output">
             <pre>
 USAGE:
-    gobreaker [options] [package] [oldversion] [newversion]
+    gobreaker [OPTIONS]
 
 OPTIONS:
-    --output, -o     Output format (text, json, markdown) (default: text)
-    --file, -f       Write report to file instead of stdout
-    --verbose, -v    Show all changes including compatible ones
-    --quiet, -q      Only show incompatible changes
-    --help, -h       Show help message
-    --version        Print version information
+    -r, --repo       Path to git repository (default: current directory)
+    -o, --old        Old reference (branch, tag, or commit) to compare from,
+                     or 'latest' to compare latest against HEAD (required)
+    -n, --new        New reference (branch, tag, or commit) to compare to (default: HEAD)
+    -f, --format     Output format (text, json, markdown) (default: text)
+    -q, --quiet      Suppress output
+    -v, --version    Print version information and exit
+    -h, --help       Show help message
 
 EXIT CODES:
     0 - No breaking changes detected
     1 - Breaking changes found
-    2 - Error occurred during analysis
 
 EXAMPLES:
-    # Compare two versions of a package
-    gobreaker github.com/example/mylib v1.0.0 v2.0.0
+    # Compare latest tag against HEAD in current directory
+    gobreaker --old latest
 
-    # Analyze current directory package
-    gobreaker . v1.0.0 HEAD
+    # Compare two tags in a specific repository
+    gobreaker --repo /path/to/repo --old v1.0.0 --new v2.0.0
 
-    # Compare specific git commits
-    gobreaker ./pkg/api abc123 def456
+    # Compare specific commits
+    gobreaker --old abc123 --new def456
 
-    # Output as JSON
-    gobreaker --output json github.com/example/api v1.0.0 v1.1.0
+    # Compare branch against tag with quiet mode
+    gobreaker --old v1.0.0 --new feature-branch --quiet
 
-    # Save report to file
-    gobreaker --file report.md --output markdown ./pkg v1.0.0 v2.0.0</pre
+    # Check breaking changes from main branch
+    gobreaker --old main --new HEAD</pre
             >
           </div>
         </div>
@@ -210,9 +211,9 @@ EXAMPLES:
 
             <div class="feature-item">
               <span class="feature-icon">▸</span>
-              <span class="feature-name">Version Compare</span>
+              <span class="feature-name">Git Reference Compare</span>
               <span class="feature-desc"
-                >Compare any two versions, commits, or branches of your Go packages</span
+                >Compare any two git references: tags, branches, or commits in a repository</span
               >
             </div>
 
@@ -234,8 +235,8 @@ EXAMPLES:
 
             <div class="feature-item">
               <span class="feature-icon">▸</span>
-              <span class="feature-name">Output Formats</span>
-              <span class="feature-desc">Generate reports in text, JSON, or Markdown formats</span>
+              <span class="feature-name">Text Output</span>
+              <span class="feature-desc">Clear text-based reports with proper categorization</span>
             </div>
 
             <div class="feature-item">
@@ -248,9 +249,9 @@ EXAMPLES:
 
             <div class="feature-item">
               <span class="feature-icon">▸</span>
-              <span class="feature-name">Git Support</span>
+              <span class="feature-name">Latest Tag Support</span>
               <span class="feature-desc"
-                >Built-in support for analyzing changes between git commits and tags</span
+                >Special 'latest' reference to automatically compare against the most recent tag</span
               >
             </div>
 
@@ -268,13 +269,13 @@ EXAMPLES:
           <div class="section-header">Examples</div>
 
           <div class="example-section">
-            <div class="example-title">## Basic Package Analysis</div>
+            <div class="example-title">## Basic Repository Analysis</div>
             <div class="prompt">
               <span class="prompt-symbol">gobreaker@v0.1.0:~$</span>
-              <span class="command">gobreaker github.com/example/mylib v1.0.0 v1.1.0</span>
+              <span class="command">gobreaker --old v1.0.0 --new v1.1.0</span>
             </div>
             <div class="output">
-              <pre><span class="success">•</span> analyzing package: github.com/example/mylib
+              <pre><span class="success">•</span> analyzing repository: ./
 <span class="success">•</span> comparing v1.0.0 -> v1.1.0
 <span class="success">•</span> found 0 incompatible changes
 <span class="success">•</span> found 3 compatible changes
@@ -292,10 +293,10 @@ Compatible changes:
             <div class="example-title">## Detecting Breaking Changes</div>
             <div class="prompt">
               <span class="prompt-symbol">gobreaker@v0.1.0:~$</span>
-              <span class="command">gobreaker github.com/example/mylib v1.0.0 v2.0.0</span>
+              <span class="command">gobreaker --old v1.0.0 --new v2.0.0</span>
             </div>
             <div class="output">
-              <pre><span class="success">•</span> analyzing package: github.com/example/mylib
+              <pre><span class="success">•</span> analyzing repository: ./
 <span class="success">•</span> comparing v1.0.0 -> v2.0.0
 <span class="warning">•</span> found <span class="error">3 incompatible</span> changes
 <span class="success">•</span> found <span class="success">5 compatible</span> changes
@@ -318,30 +319,24 @@ Compatible changes:
           </div>
 
           <div class="example-section">
-            <div class="example-title">## JSON Output</div>
+            <div class="example-title">## Compare Latest Tag with HEAD</div>
             <div class="prompt">
               <span class="prompt-symbol">gobreaker@v0.1.0:~$</span>
               <span class="command"
-                >gobreaker --output json github.com/example/api v1.0.0 v1.1.0</span
+                >gobreaker --old latest</span
               >
             </div>
             <div class="output">
-              <pre>
-{
-  "package": "github.com/example/api",
-  "old_version": "v1.0.0",
-  "new_version": "v1.1.0",
-  "incompatible_changes": [],
-  "compatible_changes": [
-    {
-      "type": "added",
-      "object": "func",
-      "name": "ValidateRequest",
-      "detail": "func ValidateRequest(r *Request) error"
-    }
-  ],
-  "has_breaking_changes": false
-}</pre
+              <pre><span class="success">•</span> analyzing repository: ./
+<span class="success">•</span> comparing v0.1.0 -> HEAD
+<span class="success">•</span> found 0 incompatible changes
+<span class="success">•</span> found 2 compatible changes
+
+Compatible changes:
+  + Added: func ValidateRequest(r *Request) error
+  + Added: const MaxRetries = 3
+
+<span class="success">•</span> no breaking changes detected</pre
               >
             </div>
           </div>
@@ -354,7 +349,7 @@ Compatible changes:
             </div>
             <div class="prompt">
               <span class="prompt-symbol">gobreaker@v0.1.0:~$</span>
-              <span class="command">gobreaker ./api v1.5.0 HEAD || {</span>
+              <span class="command">gobreaker --repo ./api --old v1.5.0 --new HEAD || {</span>
             </div>
             <div class="prompt">
               <span class="prompt-symbol">></span>
@@ -369,7 +364,7 @@ Compatible changes:
               <span class="prompt-symbol">></span> <span class="command">}</span>
             </div>
             <div class="output">
-              <pre><span class="success">•</span> analyzing package: ./api
+              <pre><span class="success">•</span> analyzing repository: ./api
 <span class="success">•</span> comparing v1.5.0 -> HEAD
 <span class="success">•</span> found 0 incompatible changes
 <span class="success">•</span> found 2 compatible changes
