@@ -7,19 +7,17 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/go-git/go-git/v5"
-	"github.com/go-git/go-git/v5/plumbing"
 	"golang.org/x/exp/apidiff"
 	"golang.org/x/tools/go/packages"
 )
 
 type StatusError struct {
-	Stat git.Status
-	Err  error
+	Status string
+	Err    error
 }
 
 func (err *StatusError) Error() string {
-	return fmt.Sprintf("%v\n%v", err.Err, err.Stat)
+	return fmt.Sprintf("%v\ngit status:\n%v", err.Err, err.Status)
 }
 
 func comparePackages(oldPkgs, newPkgs map[string]*packages.Package) (map[string]apidiff.Report, bool) {
@@ -60,40 +58,35 @@ func compareImports(oldPkgs, newPkgs map[string]*packages.Package) (map[string]a
 	return reports, incompatible
 }
 
-func getHashes(repo *git.Repository, oldRev, newRev plumbing.Revision) (*plumbing.Hash, *plumbing.Hash, error) {
-	oldCommitHash, err := repo.ResolveRevision(oldRev)
-	if err != nil {
-		return nil, nil, fmt.Errorf("could not get hash for %q: %v", oldRev, err)
+func getPackages(repoPath string, hash string) (map[string]*packages.Package, map[string]*packages.Package, error) {
+	// Checkout the specific commit
+	if _, err := runGitCommand(repoPath, "checkout", "--force", hash); err != nil {
+		return nil, nil, fmt.Errorf("failed to checkout %s: %w", hash, err)
 	}
 
-	newCommitHash, err := repo.ResolveRevision(newRev)
-	if err != nil {
-		return nil, nil, fmt.Errorf("could not get hash for %q: %v", newRev, err)
+	// Clean untracked files
+	if _, err := runGitCommand(repoPath, "clean", "-fd"); err != nil {
+		return nil, nil, fmt.Errorf("failed to clean working directory: %w", err)
 	}
 
-	return oldCommitHash, newCommitHash, nil
-}
-
-func getPackages(wt git.Worktree, hash plumbing.Hash) (map[string]*packages.Package, map[string]*packages.Package, error) {
-	if err := wt.Checkout(&git.CheckoutOptions{Hash: hash, Force: true}); err != nil {
-		return nil, nil, err
-	}
-	if err := wt.Clean(&git.CleanOptions{Dir: true}); err != nil {
-		return nil, nil, err
-	}
-	if err := wt.Reset(&git.ResetOptions{Commit: hash, Mode: git.HardReset}); err != nil {
-		return nil, nil, err
+	// Hard reset to ensure clean state
+	if _, err := runGitCommand(repoPath, "reset", "--hard", hash); err != nil {
+		return nil, nil, fmt.Errorf("failed to reset to %s: %w", hash, err)
 	}
 
+	// Determine go module flags
 	goFlags := "-mod=readonly"
-	if st, err := os.Stat(filepath.Join(wt.Filesystem.Root(), "vendor")); err == nil && st.IsDir() {
+	if st, err := os.Stat(filepath.Join(repoPath, "vendor")); err == nil && st.IsDir() {
 		goFlags = "-mod=vendor"
 	}
+
+	// Load packages
 	cfg := packages.Config{
 		Mode: packages.NeedName | packages.NeedFiles | packages.NeedCompiledGoFiles |
 			packages.NeedImports | packages.NeedTypes | packages.NeedTypesSizes,
 		Tests:      false,
 		BuildFlags: []string{goFlags},
+		Dir:        repoPath,
 	}
 	pkgs, err := packages.Load(&cfg, "./...")
 	if err != nil {
@@ -117,19 +110,10 @@ func getPackages(wt git.Worktree, hash plumbing.Hash) (map[string]*packages.Pack
 		}
 	}
 
-	if err := wt.Reset(&git.ResetOptions{
-		Mode:   git.HardReset,
-		Commit: hash,
-	}); err != nil {
+	// Ensure we're still at the right commit after package loading
+	if _, err := runGitCommand(repoPath, "reset", "--hard", hash); err != nil {
 		return nil, nil, fmt.Errorf("failed to hard reset to %v: %w", hash, err)
 	}
 
 	return selfPkgs, importPkgs, nil
-}
-
-func checkoutRef(wt git.Worktree, ref plumbing.Reference) (err error) {
-	if ref.Name() == "HEAD" {
-		return wt.Checkout(&git.CheckoutOptions{Hash: ref.Hash()})
-	}
-	return wt.Checkout(&git.CheckoutOptions{Branch: ref.Name()})
 }

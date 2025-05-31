@@ -1,75 +1,83 @@
 package git
 
 import (
+	"bytes"
 	"fmt"
+	"os/exec"
+	"strings"
 
 	"github.com/flaticols/gobreaker/pkg/breaking"
-	"github.com/go-git/go-billy/v5/osfs"
-	"github.com/go-git/go-git/v5"
-	"github.com/go-git/go-git/v5/plumbing"
-	"github.com/go-git/go-git/v5/plumbing/format/gitignore"
 )
 
 // OpenRepo compares API differences between two commits in a Git repository.
 // It returns a Diff report with details on compatibility and breaking changes.
 func OpenRepo(repoPath, oldCommit, newCommit string) (*breaking.Diff, error) {
-	repo, err := git.PlainOpen(repoPath)
-	if err != nil {
-		return nil, fmt.Errorf("failed to open repository at %s: %w", repoPath, err)
+	// Ensure we're in a git repository
+	if _, err := runGitCommand(repoPath, "rev-parse", "--git-dir"); err != nil {
+		return nil, fmt.Errorf("not a git repository: %s", repoPath)
 	}
 
-	wt, err := repo.Worktree()
+	// Check if working tree is clean
+	status, err := runGitCommand(repoPath, "status", "--porcelain")
 	if err != nil {
-		return nil, fmt.Errorf("failed to get worktree: %w", err)
-	}
-
-	wt.Filesystem = osfs.New(repoPath)
-	rootFS := osfs.New("/")
-
-	globalIgnoreFile, err := gitignore.LoadGlobalPatterns(rootFS)
-	if err != nil {
-		return nil, fmt.Errorf("failed to load gitignore: %v", err)
-	}
-	wt.Excludes = append(wt.Excludes, globalIgnoreFile...)
-
-	sysIgnoreFile, err := gitignore.LoadSystemPatterns(rootFS)
-	if err != nil {
-		return nil, fmt.Errorf("failed to load system gitignore: %v", err)
-	}
-	wt.Excludes = append(wt.Excludes, sysIgnoreFile...)
-
-	if stat, err := wt.Status(); err != nil {
 		return nil, fmt.Errorf("failed to get git status: %w", err)
-	} else if !stat.IsClean() {
-		return nil, &StatusError{stat, fmt.Errorf("current git tree is dirty")}
+	}
+	if status != "" {
+		return nil, &StatusError{Status: status, Err: fmt.Errorf("current git tree is dirty")}
 	}
 
-	origRef, err := repo.Head()
+	// Get current HEAD ref
+	origRef, err := runGitCommand(repoPath, "symbolic-ref", "HEAD")
 	if err != nil {
-		return nil, fmt.Errorf("failed to get current HEAD reference: %w", err)
+		// If not on a branch, get the commit hash
+		origRef, err = runGitCommand(repoPath, "rev-parse", "HEAD")
+		if err != nil {
+			return nil, fmt.Errorf("failed to get current HEAD reference: %w", err)
+		}
 	}
+	origRef = strings.TrimSpace(origRef)
 
-	oldHash, newHash, err := getHashes(repo, plumbing.Revision(oldCommit), plumbing.Revision(newCommit))
+	// Resolve commit hashes
+	oldHash, err := runGitCommand(repoPath, "rev-parse", oldCommit)
 	if err != nil {
-		return nil, fmt.Errorf("failed to lookup git commit hashes: %w", err)
+		return nil, fmt.Errorf("could not resolve commit %q: %w", oldCommit, err)
 	}
+	oldHash = strings.TrimSpace(oldHash)
 
+	newHash, err := runGitCommand(repoPath, "rev-parse", newCommit)
+	if err != nil {
+		return nil, fmt.Errorf("could not resolve commit %q: %w", newCommit, err)
+	}
+	newHash = strings.TrimSpace(newHash)
+
+	// Ensure we restore original state on exit
 	defer func() {
-		if err := checkoutRef(*wt, *origRef); err != nil {
-			fmt.Printf("WARNING: failed to checkout your original working commit after diff: %v\n", err)
+		var checkoutErr error
+		if strings.HasPrefix(origRef, "refs/") {
+			// Checkout branch
+			_, checkoutErr = runGitCommand(repoPath, "checkout", origRef)
+		} else {
+			// Checkout detached HEAD
+			_, checkoutErr = runGitCommand(repoPath, "checkout", origRef)
+		}
+		if checkoutErr != nil {
+			fmt.Printf("WARNING: failed to checkout your original working commit after diff: %v\n", checkoutErr)
 		}
 	}()
 
-	selfOld, importsOld, err := getPackages(*wt, *oldHash)
+	// Get packages from old commit
+	selfOld, importsOld, err := getPackages(repoPath, oldHash)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get packages from old commit %q (%s): %w", oldCommit, oldHash, err)
 	}
 
-	selfNew, importsNew, err := getPackages(*wt, *newHash)
+	// Get packages from new commit
+	selfNew, importsNew, err := getPackages(repoPath, newHash)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get packages from new commit %q (%s): %w", newCommit, newHash, err)
 	}
 
+	// Compare packages
 	apiReports, incompatible := comparePackages(selfOld, selfNew)
 	apiImports, breakingImports := compareImports(importsOld, importsNew)
 
@@ -78,4 +86,21 @@ func OpenRepo(repoPath, oldCommit, newCommit string) (*breaking.Diff, error) {
 	d.SetIncompatible(incompatible)
 
 	return d, nil
+}
+
+// runGitCommand executes a git command in the specified directory
+func runGitCommand(dir string, args ...string) (string, error) {
+	cmd := exec.Command("git", args...)
+	cmd.Dir = dir
+	
+	var stdout, stderr bytes.Buffer
+	cmd.Stdout = &stdout
+	cmd.Stderr = &stderr
+	
+	err := cmd.Run()
+	if err != nil {
+		return "", fmt.Errorf("git %s failed: %w\nstderr: %s", strings.Join(args, " "), err, stderr.String())
+	}
+	
+	return stdout.String(), nil
 }
