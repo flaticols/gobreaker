@@ -1,4 +1,4 @@
-package git
+package gitrepo
 
 import (
 	"fmt"
@@ -12,8 +12,8 @@ import (
 )
 
 type StatusError struct {
-	Status string
 	Err    error
+	Status string
 }
 
 func (err *StatusError) Error() string {
@@ -58,7 +58,7 @@ func compareImports(oldPkgs, newPkgs map[string]*packages.Package) (map[string]a
 	return reports, incompatible
 }
 
-func getPackages(repoPath string, hash string) (map[string]*packages.Package, map[string]*packages.Package, error) {
+func getPackages(repoPath string, hash string, includeInternal bool) (map[string]*packages.Package, map[string]*packages.Package, error) {
 	// Checkout the specific commit
 	if _, err := runGitCommand(repoPath, "checkout", "--force", hash); err != nil {
 		return nil, nil, fmt.Errorf("failed to checkout %s: %w", hash, err)
@@ -96,8 +96,8 @@ func getPackages(repoPath string, hash string) (map[string]*packages.Package, ma
 	selfPkgs := make(map[string]*packages.Package)
 	importPkgs := make(map[string]*packages.Package)
 	for _, pkg := range pkgs {
-		// skip internal packages since they do not contain public APIs
-		if strings.HasSuffix(pkg.PkgPath, "/internal") || strings.Contains(pkg.PkgPath, "/internal/") {
+		// by default and in must-cases, we must skip internal packages; however, in same cases it might be useful
+		if !includeInternal && (strings.HasSuffix(pkg.PkgPath, "/internal") || strings.Contains(pkg.PkgPath, "/internal/")) {
 			continue
 		}
 		selfPkgs[pkg.PkgPath] = pkg

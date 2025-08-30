@@ -1,4 +1,4 @@
-package git
+package gitrepo
 
 import (
 	"bytes"
@@ -11,13 +11,13 @@ import (
 
 // OpenRepo compares API differences between two commits in a Git repository.
 // It returns a Diff report with details on compatibility and breaking changes.
-func OpenRepo(repoPath, oldCommit, newCommit string) (*breaking.Diff, error) {
+func OpenRepo(repoPath, oldCommit, newCommit string, includeInternal bool) (*breaking.Diff, error) {
 	// Ensure we're in a git repository
 	if _, err := runGitCommand(repoPath, "rev-parse", "--git-dir"); err != nil {
 		return nil, fmt.Errorf("not a git repository: %s", repoPath)
 	}
 
-	// Check if working tree is clean
+	// Check if the working tree is clean
 	status, err := runGitCommand(repoPath, "status", "--porcelain")
 	if err != nil {
 		return nil, fmt.Errorf("failed to get git status: %w", err)
@@ -66,13 +66,13 @@ func OpenRepo(repoPath, oldCommit, newCommit string) (*breaking.Diff, error) {
 	}()
 
 	// Get packages from old commit
-	selfOld, importsOld, err := getPackages(repoPath, oldHash)
+	selfOld, importsOld, err := getPackages(repoPath, oldHash, includeInternal)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get packages from old commit %q (%s): %w", oldCommit, oldHash, err)
 	}
 
 	// Get packages from new commit
-	selfNew, importsNew, err := getPackages(repoPath, newHash)
+	selfNew, importsNew, err := getPackages(repoPath, newHash, includeInternal)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get packages from new commit %q (%s): %w", newCommit, newHash, err)
 	}
@@ -92,15 +92,15 @@ func OpenRepo(repoPath, oldCommit, newCommit string) (*breaking.Diff, error) {
 func runGitCommand(dir string, args ...string) (string, error) {
 	cmd := exec.Command("git", args...)
 	cmd.Dir = dir
-	
+
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr
-	
+
 	err := cmd.Run()
 	if err != nil {
 		return "", fmt.Errorf("git %s failed: %w\nstderr: %s", strings.Join(args, " "), err, stderr.String())
 	}
-	
+
 	return stdout.String(), nil
 }
