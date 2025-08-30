@@ -5,7 +5,7 @@ import (
 	"os"
 	"runtime/debug"
 
-	"github.com/flaticols/gobreaker/internal/git"
+	"github.com/flaticols/gobreaker/internal/gitrepo"
 	"github.com/jessevdk/go-flags"
 )
 
@@ -58,7 +58,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	diff, err := git.OpenRepo(programCfg.RepoPath, programCfg.OldRef, programCfg.NewRef)
+	diff, err := gitrepo.OpenRepo(programCfg.RepoPath, programCfg.OldRef, programCfg.NewRef, false)
 	if err != nil {
 		_, _ = fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 		os.Exit(1)
