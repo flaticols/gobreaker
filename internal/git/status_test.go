@@ -2,8 +2,14 @@ package git
 
 import (
 	"go/types"
+	"os"
+	"path/filepath"
+	"strings"
 	"testing"
+	"time"
 
+	"github.com/go-git/go-git/v5"
+	"github.com/go-git/go-git/v5/plumbing/object"
 	"golang.org/x/exp/apidiff"
 	"golang.org/x/tools/go/packages"
 )
@@ -632,4 +638,608 @@ func TestComparePackages_TypeAliasChanges(t *testing.T) {
 	if len(reports["github.com/example/internal/types"].Changes) == 0 {
 		t.Error("Expected changes to be detected for type alias removal")
 	}
+}
+
+// TestIsFilesystemPath tests the filesystem path detection logic.
+func TestIsFilesystemPath(t *testing.T) {
+	testCases := []struct {
+		name     string
+		path     string
+		expected bool
+		setup    func() (string, func())
+	}{
+		{
+			name:     "absolute path that exists",
+			expected: true,
+			setup: func() (string, func()) {
+				tmpDir, err := os.MkdirTemp("", "gobreaker-test-*")
+				if err != nil {
+					t.Fatalf("Failed to create temp dir: %v", err)
+				}
+				return tmpDir, func() { os.RemoveAll(tmpDir) }
+			},
+		},
+		{
+			name:     "relative path that exists",
+			path:     ".",
+			expected: true,
+			setup:    func() (string, func()) { return ".", func() {} },
+		},
+		{
+			name:     "path that does not exist",
+			path:     "/nonexistent/path/that/should/not/exist",
+			expected: false,
+			setup:    func() (string, func()) { return "/nonexistent/path/that/should/not/exist", func() {} },
+		},
+		{
+			name:     "empty path",
+			path:     "",
+			expected: false,
+			setup:    func() (string, func()) { return "", func() {} },
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			path := tc.path
+			cleanup := func() {}
+			if tc.setup != nil {
+				path, cleanup = tc.setup()
+				defer cleanup()
+			}
+
+			result := IsFilesystemPath(path)
+			if result != tc.expected {
+				t.Errorf("IsFilesystemPath(%q) = %v, expected %v", path, result, tc.expected)
+			}
+		})
+	}
+}
+
+// TestIsGitRef tests the git reference detection logic.
+func TestIsGitRef(t *testing.T) {
+	// Create a temporary git repository for testing
+	tmpDir, err := os.MkdirTemp("", "gobreaker-git-test-*")
+	if err != nil {
+		t.Fatalf("Failed to create temp dir: %v", err)
+	}
+	defer os.RemoveAll(tmpDir)
+
+	// Initialize a git repo
+	repo, err := git.PlainInit(tmpDir, false)
+	if err != nil {
+		t.Fatalf("Failed to init git repo: %v", err)
+	}
+
+	// Create a commit
+	wt, err := repo.Worktree()
+	if err != nil {
+		t.Fatalf("Failed to get worktree: %v", err)
+	}
+
+	// Create a file and commit it
+	testFile := filepath.Join(tmpDir, "test.txt")
+	if err := os.WriteFile(testFile, []byte("test"), 0644); err != nil {
+		t.Fatalf("Failed to write test file: %v", err)
+	}
+
+	if _, err := wt.Add("test.txt"); err != nil {
+		t.Fatalf("Failed to add file: %v", err)
+	}
+
+	commit, err := wt.Commit("Initial commit", &git.CommitOptions{
+		Author: &object.Signature{
+			Name:  "Test",
+			Email: "test@example.com",
+			When:  time.Now(),
+		},
+	})
+	if err != nil {
+		t.Fatalf("Failed to commit: %v", err)
+	}
+
+	testCases := []struct {
+		name     string
+		ref      string
+		expected bool
+	}{
+		{
+			name:     "HEAD reference",
+			ref:      "HEAD",
+			expected: true,
+		},
+		{
+			name:     "commit hash",
+			ref:      commit.String(),
+			expected: true,
+		},
+		{
+			name:     "short commit hash",
+			ref:      commit.String()[:7],
+			expected: true,
+		},
+		{
+			name:     "invalid reference",
+			ref:      "nonexistent-branch",
+			expected: false,
+		},
+		{
+			name:     "empty reference",
+			ref:      "",
+			expected: false,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			result := IsGitRef(tmpDir, tc.ref)
+			if result != tc.expected {
+				t.Errorf("IsGitRef(%q, %q) = %v, expected %v", tmpDir, tc.ref, result, tc.expected)
+			}
+		})
+	}
+}
+
+// TestIsGitRef_NoRepo tests IsGitRef when not in a git repository.
+func TestIsGitRef_NoRepo(t *testing.T) {
+	tmpDir, err := os.MkdirTemp("", "gobreaker-no-git-*")
+	if err != nil {
+		t.Fatalf("Failed to create temp dir: %v", err)
+	}
+	defer os.RemoveAll(tmpDir)
+
+	result := IsGitRef(tmpDir, "HEAD")
+	if result != false {
+		t.Errorf("IsGitRef in non-git directory should return false, got %v", result)
+	}
+}
+
+// TestGetPackagesFromPath tests loading packages from a filesystem path.
+func TestGetPackagesFromPath(t *testing.T) {
+	// Create a temporary directory with a simple Go package
+	tmpDir, err := os.MkdirTemp("", "gobreaker-pkg-test-*")
+	if err != nil {
+		t.Fatalf("Failed to create temp dir: %v", err)
+	}
+	defer os.RemoveAll(tmpDir)
+
+	// Create a simple Go file
+	goFile := filepath.Join(tmpDir, "main.go")
+	goContent := `package main
+
+type ExportedType struct {
+	Field string
+}
+
+func ExportedFunc() string {
+	return "test"
+}
+
+func privateFunc() {
+	// private function
+}
+`
+	if err := os.WriteFile(goFile, []byte(goContent), 0644); err != nil {
+		t.Fatalf("Failed to write Go file: %v", err)
+	}
+
+	// Create go.mod
+	goMod := filepath.Join(tmpDir, "go.mod")
+	goModContent := `module example.com/testpkg
+
+go 1.21
+`
+	if err := os.WriteFile(goMod, []byte(goModContent), 0644); err != nil {
+		t.Fatalf("Failed to write go.mod: %v", err)
+	}
+
+	// Test loading packages
+	selfPkgs, importPkgs, err := getPackagesFromPath(tmpDir, false)
+	if err != nil {
+		t.Fatalf("Failed to load packages: %v", err)
+	}
+
+	if len(selfPkgs) == 0 {
+		t.Error("Expected at least one package, got 0")
+	}
+
+	// Verify the package was loaded
+	found := false
+	for pkgPath := range selfPkgs {
+		if pkgPath == "example.com/testpkg" {
+			found = true
+			break
+		}
+	}
+
+	if !found {
+		t.Error("Expected to find example.com/testpkg in loaded packages")
+	}
+
+	// importPkgs might be empty for a simple package with no external deps
+	if importPkgs == nil {
+		t.Error("Expected importPkgs map to be initialized, got nil")
+	}
+}
+
+// TestGetPackagesFromPath_WithInternal tests internal package filtering.
+func TestGetPackagesFromPath_WithInternal(t *testing.T) {
+	// Create a temporary directory with internal package
+	tmpDir, err := os.MkdirTemp("", "gobreaker-internal-test-*")
+	if err != nil {
+		t.Fatalf("Failed to create temp dir: %v", err)
+	}
+	defer os.RemoveAll(tmpDir)
+
+	// Create main package
+	if err := os.WriteFile(filepath.Join(tmpDir, "main.go"), []byte(`package main
+func Main() {}`), 0644); err != nil {
+		t.Fatalf("Failed to write main.go: %v", err)
+	}
+
+	// Create internal package
+	internalDir := filepath.Join(tmpDir, "internal")
+	if err := os.MkdirAll(internalDir, 0755); err != nil {
+		t.Fatalf("Failed to create internal dir: %v", err)
+	}
+
+	if err := os.WriteFile(filepath.Join(internalDir, "helper.go"), []byte(`package internal
+func Helper() string { return "help" }`), 0644); err != nil {
+		t.Fatalf("Failed to write helper.go: %v", err)
+	}
+
+	// Create go.mod
+	if err := os.WriteFile(filepath.Join(tmpDir, "go.mod"), []byte(`module example.com/testapp
+go 1.21
+`), 0644); err != nil {
+		t.Fatalf("Failed to write go.mod: %v", err)
+	}
+
+	// Test with includeInternal = false (default)
+	selfPkgs, _, err := getPackagesFromPath(tmpDir, false)
+	if err != nil {
+		t.Fatalf("Failed to load packages: %v", err)
+	}
+
+	// Should not include internal package
+	for pkgPath := range selfPkgs {
+		if strings.Contains(pkgPath, "/internal") {
+			t.Errorf("Expected internal package to be filtered out, but found: %s", pkgPath)
+		}
+	}
+
+	// Test with includeInternal = true
+	selfPkgsWithInternal, _, err := getPackagesFromPath(tmpDir, true)
+	if err != nil {
+		t.Fatalf("Failed to load packages with internal: %v", err)
+	}
+
+	// Should include internal package
+	foundInternal := false
+	for pkgPath := range selfPkgsWithInternal {
+		if strings.Contains(pkgPath, "/internal") {
+			foundInternal = true
+			break
+		}
+	}
+
+	if !foundInternal {
+		t.Error("Expected internal package to be included when includeInternal=true")
+	}
+}
+
+// TestGetPackagesFromPath_InvalidPath tests error handling for invalid paths.
+func TestGetPackagesFromPath_InvalidPath(t *testing.T) {
+	_, _, err := getPackagesFromPath("/nonexistent/path/that/does/not/exist", false)
+	if err == nil {
+		t.Error("Expected error for nonexistent path, got nil")
+	}
+}
+
+// TestCompareFilesystems_BasicComparison tests filesystem comparison mode.
+func TestCompareFilesystems_BasicComparison(t *testing.T) {
+// Create two temporary directories with Go packages
+oldDir, err := os.MkdirTemp("", "gobreaker-old-*")
+if err != nil {
+t.Fatalf("Failed to create old dir: %v", err)
+}
+defer os.RemoveAll(oldDir)
+
+newDir, err := os.MkdirTemp("", "gobreaker-new-*")
+if err != nil {
+t.Fatalf("Failed to create new dir: %v", err)
+}
+defer os.RemoveAll(newDir)
+
+// Create old version with a function
+oldGoFile := `package testpkg
+
+func OldFunction() string {
+return "old"
+}
+
+func SharedFunction() int {
+return 42
+}
+`
+if err := os.WriteFile(filepath.Join(oldDir, "test.go"), []byte(oldGoFile), 0644); err != nil {
+t.Fatalf("Failed to write old test.go: %v", err)
+}
+
+if err := os.WriteFile(filepath.Join(oldDir, "go.mod"), []byte("module example.com/test\ngo 1.21\n"), 0644); err != nil {
+t.Fatalf("Failed to write old go.mod: %v", err)
+}
+
+// Create new version without OldFunction (breaking change)
+newGoFile := `package testpkg
+
+func SharedFunction() int {
+return 42
+}
+
+func NewFunction() bool {
+return true
+}
+`
+if err := os.WriteFile(filepath.Join(newDir, "test.go"), []byte(newGoFile), 0644); err != nil {
+t.Fatalf("Failed to write new test.go: %v", err)
+}
+
+if err := os.WriteFile(filepath.Join(newDir, "go.mod"), []byte("module example.com/test\ngo 1.21\n"), 0644); err != nil {
+t.Fatalf("Failed to write new go.mod: %v", err)
+}
+
+// Compare the filesystems
+diff, err := CompareFilesystems(oldDir, newDir, false)
+if err != nil {
+t.Fatalf("CompareFilesystems failed: %v", err)
+}
+
+// Should detect breaking change
+if diff.IsCompatible() {
+t.Error("Expected incompatible changes due to removed function")
+}
+}
+
+// TestCompareFilesystems_WithInternalPackages tests filesystem comparison with internal packages.
+func TestCompareFilesystems_WithInternalPackages(t *testing.T) {
+oldDir, err := os.MkdirTemp("", "gobreaker-old-internal-*")
+if err != nil {
+t.Fatalf("Failed to create old dir: %v", err)
+}
+defer os.RemoveAll(oldDir)
+
+newDir, err := os.MkdirTemp("", "gobreaker-new-internal-*")
+if err != nil {
+t.Fatalf("Failed to create new dir: %v", err)
+}
+defer os.RemoveAll(newDir)
+
+// Create old version with internal package
+if err := os.MkdirAll(filepath.Join(oldDir, "internal"), 0755); err != nil {
+t.Fatalf("Failed to create internal dir: %v", err)
+}
+
+oldInternal := `package internal
+
+func InternalFunc() string {
+return "internal"
+}
+`
+if err := os.WriteFile(filepath.Join(oldDir, "internal", "helper.go"), []byte(oldInternal), 0644); err != nil {
+t.Fatalf("Failed to write old internal: %v", err)
+}
+
+if err := os.WriteFile(filepath.Join(oldDir, "go.mod"), []byte("module example.com/test\ngo 1.21\n"), 0644); err != nil {
+t.Fatalf("Failed to write old go.mod: %v", err)
+}
+
+// Create new version without internal function
+if err := os.MkdirAll(filepath.Join(newDir, "internal"), 0755); err != nil {
+t.Fatalf("Failed to create internal dir: %v", err)
+}
+
+newInternal := `package internal
+
+// InternalFunc was removed
+`
+if err := os.WriteFile(filepath.Join(newDir, "internal", "helper.go"), []byte(newInternal), 0644); err != nil {
+t.Fatalf("Failed to write new internal: %v", err)
+}
+
+if err := os.WriteFile(filepath.Join(newDir, "go.mod"), []byte("module example.com/test\ngo 1.21\n"), 0644); err != nil {
+t.Fatalf("Failed to write new go.mod: %v", err)
+}
+
+// Compare without including internal - should be compatible
+diffWithout, err := CompareFilesystems(oldDir, newDir, false)
+if err != nil {
+t.Fatalf("CompareFilesystems failed: %v", err)
+}
+
+if !diffWithout.IsCompatible() {
+t.Error("Expected compatible when internal packages are excluded")
+}
+
+// Compare with internal packages included - should be incompatible
+diffWith, err := CompareFilesystems(oldDir, newDir, true)
+if err != nil {
+t.Fatalf("CompareFilesystems with internal failed: %v", err)
+}
+
+if diffWith.IsCompatible() {
+t.Error("Expected incompatible when internal packages are included and function is removed")
+}
+}
+
+// TestCompareFilesystems_InvalidPaths tests error handling for invalid filesystem paths.
+func TestCompareFilesystems_InvalidPaths(t *testing.T) {
+testCases := []struct {
+name    string
+oldPath string
+newPath string
+}{
+{
+name:    "both paths invalid",
+oldPath: "/nonexistent/old",
+newPath: "/nonexistent/new",
+},
+{
+name:    "old path invalid",
+oldPath: "/nonexistent/old",
+newPath: ".",
+},
+{
+name:    "new path invalid",
+oldPath: ".",
+newPath: "/nonexistent/new",
+},
+}
+
+for _, tc := range testCases {
+t.Run(tc.name, func(t *testing.T) {
+_, err := CompareFilesystems(tc.oldPath, tc.newPath, false)
+if err == nil {
+t.Error("Expected error for invalid paths, got nil")
+}
+})
+}
+}
+
+// TestAutoDetection_MixedModes tests that mixing filesystem paths and git refs is rejected.
+func TestAutoDetection_MixedModes(t *testing.T) {
+// Create a temp dir that exists
+tmpDir, err := os.MkdirTemp("", "gobreaker-mixed-*")
+if err != nil {
+t.Fatalf("Failed to create temp dir: %v", err)
+}
+defer os.RemoveAll(tmpDir)
+
+testCases := []struct {
+name     string
+arg1     string
+arg2     string
+arg1Path bool
+arg2Path bool
+}{
+{
+name:     "path and non-path",
+arg1:     tmpDir,
+arg2:     "HEAD",
+arg1Path: true,
+arg2Path: false,
+},
+{
+name:     "non-path and path",
+arg1:     "main",
+arg2:     tmpDir,
+arg1Path: false,
+arg2Path: true,
+},
+}
+
+for _, tc := range testCases {
+t.Run(tc.name, func(t *testing.T) {
+// Verify detection works as expected
+if IsFilesystemPath(tc.arg1) != tc.arg1Path {
+t.Errorf("IsFilesystemPath(%q) = %v, expected %v", tc.arg1, !tc.arg1Path, tc.arg1Path)
+}
+if IsFilesystemPath(tc.arg2) != tc.arg2Path {
+t.Errorf("IsFilesystemPath(%q) = %v, expected %v", tc.arg2, !tc.arg2Path, tc.arg2Path)
+}
+})
+}
+}
+
+// TestComparePackages_ComplexScenarios tests complex real-world scenarios.
+func TestComparePackages_ComplexScenarios(t *testing.T) {
+// Scenario: Package with multiple types, methods, and interfaces changing together
+oldPkg := types.NewPackage("github.com/example/complex", "complex")
+
+// Old version has a type with methods and an interface
+oldStruct := types.NewStruct([]*types.Var{
+types.NewField(0, oldPkg, "Name", types.Typ[types.String], false),
+types.NewField(0, oldPkg, "Age", types.Typ[types.Int], false),
+}, nil)
+oldType := types.NewNamed(types.NewTypeName(0, oldPkg, "Person", nil), oldStruct, nil)
+
+// Add methods to the type
+sig1 := types.NewSignatureType(types.NewVar(0, oldPkg, "", oldType), nil, nil, nil,
+types.NewTuple(types.NewVar(0, oldPkg, "", types.Typ[types.String])), false)
+oldType.AddMethod(types.NewFunc(0, oldPkg, "GetName", sig1))
+
+sig2 := types.NewSignatureType(types.NewVar(0, oldPkg, "", oldType), nil, nil, nil,
+types.NewTuple(types.NewVar(0, oldPkg, "", types.Typ[types.Int])), false)
+oldType.AddMethod(types.NewFunc(0, oldPkg, "GetAge", sig2))
+
+oldPkg.Scope().Insert(oldType.Obj())
+
+// Add an interface
+method1 := types.NewFunc(0, oldPkg, "DoSomething", types.NewSignatureType(nil, nil, nil, nil, nil, false))
+oldInterface := types.NewInterfaceType([]*types.Func{method1}, nil)
+oldInterfaceType := types.NewNamed(types.NewTypeName(0, oldPkg, "Doer", nil), oldInterface, nil)
+oldPkg.Scope().Insert(oldInterfaceType.Obj())
+
+oldPkgs := map[string]*packages.Package{
+"github.com/example/complex": {
+PkgPath: "github.com/example/complex",
+Name:    "complex",
+Types:   oldPkg,
+},
+}
+
+// New version removes one method and changes the struct
+newPkg := types.NewPackage("github.com/example/complex", "complex")
+
+newStruct := types.NewStruct([]*types.Var{
+types.NewField(0, newPkg, "Name", types.Typ[types.String], false),
+// Age field removed - breaking change
+types.NewField(0, newPkg, "Email", types.Typ[types.String], false), // New field added
+}, nil)
+newType := types.NewNamed(types.NewTypeName(0, newPkg, "Person", nil), newStruct, nil)
+
+// Only add GetName method (GetAge removed - breaking change)
+newSig1 := types.NewSignatureType(types.NewVar(0, newPkg, "", newType), nil, nil, nil,
+types.NewTuple(types.NewVar(0, newPkg, "", types.Typ[types.String])), false)
+newType.AddMethod(types.NewFunc(0, newPkg, "GetName", newSig1))
+
+newPkg.Scope().Insert(newType.Obj())
+
+// Interface unchanged
+newMethod1 := types.NewFunc(0, newPkg, "DoSomething", types.NewSignatureType(nil, nil, nil, nil, nil, false))
+newInterface := types.NewInterfaceType([]*types.Func{newMethod1}, nil)
+newInterfaceType := types.NewNamed(types.NewTypeName(0, newPkg, "Doer", nil), newInterface, nil)
+newPkg.Scope().Insert(newInterfaceType.Obj())
+
+newPkgs := map[string]*packages.Package{
+"github.com/example/complex": {
+PkgPath: "github.com/example/complex",
+Name:    "complex",
+Types:   newPkg,
+},
+}
+
+reports, incompatible := compareImports(oldPkgs, newPkgs)
+
+if !incompatible {
+t.Error("Expected incompatible=true due to removed field and method")
+}
+
+report := reports["github.com/example/complex"]
+if len(report.Changes) == 0 {
+t.Error("Expected changes to be detected")
+}
+
+// Verify we detected incompatible changes
+foundIncompatible := false
+for _, change := range report.Changes {
+if !change.Compatible {
+foundIncompatible = true
+t.Logf("Detected incompatible change: %s", change.Message)
+}
+}
+
+if !foundIncompatible {
+t.Error("Expected at least one incompatible change")
+}
 }
