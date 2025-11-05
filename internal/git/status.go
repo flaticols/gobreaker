@@ -5,7 +5,6 @@ import (
 	"go/types"
 	"os"
 	"path/filepath"
-	"strings"
 
 	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/plumbing"
@@ -103,10 +102,9 @@ func getPackages(wt git.Worktree, hash plumbing.Hash) (map[string]*packages.Pack
 	selfPkgs := make(map[string]*packages.Package)
 	importPkgs := make(map[string]*packages.Package)
 	for _, pkg := range pkgs {
-		// skip internal packages since they do not contain public APIs
-		if strings.HasSuffix(pkg.PkgPath, "/internal") || strings.Contains(pkg.PkgPath, "/internal/") {
-			continue
-		}
+		// Include all packages (even internal ones) because apidiff.Changes()
+		// only analyzes exported (public) APIs. Internal packages can have
+		// public APIs that are accessible within the module/parent package.
 		selfPkgs[pkg.PkgPath] = pkg
 	}
 	for _, pkg := range pkgs {
