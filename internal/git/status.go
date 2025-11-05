@@ -5,6 +5,7 @@ import (
 	"go/types"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/plumbing"
@@ -73,7 +74,7 @@ func getHashes(repo *git.Repository, oldRev, newRev plumbing.Revision) (*plumbin
 	return oldCommitHash, newCommitHash, nil
 }
 
-func getPackages(wt git.Worktree, hash plumbing.Hash) (map[string]*packages.Package, map[string]*packages.Package, error) {
+func getPackages(wt git.Worktree, hash plumbing.Hash, includeInternal bool) (map[string]*packages.Package, map[string]*packages.Package, error) {
 	if err := wt.Checkout(&git.CheckoutOptions{Hash: hash, Force: true}); err != nil {
 		return nil, nil, err
 	}
@@ -102,9 +103,12 @@ func getPackages(wt git.Worktree, hash plumbing.Hash) (map[string]*packages.Pack
 	selfPkgs := make(map[string]*packages.Package)
 	importPkgs := make(map[string]*packages.Package)
 	for _, pkg := range pkgs {
-		// Include all packages (even internal ones) because apidiff.Changes()
-		// only analyzes exported (public) APIs. Internal packages can have
-		// public APIs that are accessible within the module/parent package.
+		// Skip internal packages by default unless includeInternal flag is set.
+		// Internal packages are those with "/internal/" in their path or ending with "/internal".
+		// When includeInternal is true, all packages are analyzed for their public APIs.
+		if !includeInternal && (strings.HasSuffix(pkg.PkgPath, "/internal") || strings.Contains(pkg.PkgPath, "/internal/")) {
+			continue
+		}
 		selfPkgs[pkg.PkgPath] = pkg
 	}
 	for _, pkg := range pkgs {

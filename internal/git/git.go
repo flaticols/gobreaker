@@ -12,7 +12,8 @@ import (
 
 // OpenRepo compares API differences between two commits in a Git repository.
 // It returns a Diff report with details on compatibility and breaking changes.
-func OpenRepo(repoPath, oldCommit, newCommit string) (*breaking.Diff, error) {
+// If includeInternal is false, internal packages are excluded from analysis.
+func OpenRepo(repoPath, oldCommit, newCommit string, includeInternal bool) (*breaking.Diff, error) {
 	repo, err := git.PlainOpen(repoPath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to open repository at %s: %w", repoPath, err)
@@ -60,12 +61,12 @@ func OpenRepo(repoPath, oldCommit, newCommit string) (*breaking.Diff, error) {
 		}
 	}()
 
-	selfOld, importsOld, err := getPackages(*wt, *oldHash)
+	selfOld, importsOld, err := getPackages(*wt, *oldHash, includeInternal)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get packages from old commit %q (%s): %w", oldCommit, oldHash, err)
 	}
 
-	selfNew, importsNew, err := getPackages(*wt, *newHash)
+	selfNew, importsNew, err := getPackages(*wt, *newHash, includeInternal)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get packages from new commit %q (%s): %w", newCommit, newHash, err)
 	}

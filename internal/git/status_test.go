@@ -8,6 +8,12 @@ import (
 	"golang.org/x/tools/go/packages"
 )
 
+// Note: These tests focus on the comparePackages and compareImports functions
+// which handle API diff analysis. The tests validate that when internal packages
+// are included in the analysis (via the --include-internal flag), the tool
+// correctly detects breaking changes in their public APIs. By default, internal
+// packages are excluded unless the includeInternal parameter is true.
+
 // TestComparePackages_InternalPackageWithPublicAPI tests that internal packages
 // with exported (public) APIs are correctly analyzed for breaking changes.
 func TestComparePackages_InternalPackageWithPublicAPI(t *testing.T) {

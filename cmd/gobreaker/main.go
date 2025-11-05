@@ -16,9 +16,10 @@ type programOptions struct {
 	OldRef string `short:"o" long:"old" description:"Old reference (branch, tag, or commit) to compare from, or 'latest' to compare latest against HEAD" required:"true"`
 	NewRef string `short:"n" long:"new" description:"New reference (branch, tag, or commit) to compare to" default:"HEAD"`
 	//nolint:golines
-	Output  string `short:"f" long:"format" description:"Output format (text, json, markdown)" default:"text" choice:"text"`
-	Quite   bool   `short:"q" long:"quiet" description:"Suppress output"`
-	Version bool   `short:"v" long:"version" description:"Print version information and exit"`
+	Output          string `short:"f" long:"format" description:"Output format (text, json, markdown)" default:"text" choice:"text"`
+	IncludeInternal bool   `short:"i" long:"include-internal" description:"Include internal packages in API analysis"`
+	Quite           bool   `short:"q" long:"quiet" description:"Suppress output"`
+	Version         bool   `short:"v" long:"version" description:"Print version information and exit"`
 }
 
 func main() {
@@ -58,7 +59,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	diff, err := git.OpenRepo(programCfg.RepoPath, programCfg.OldRef, programCfg.NewRef)
+	diff, err := git.OpenRepo(programCfg.RepoPath, programCfg.OldRef, programCfg.NewRef, programCfg.IncludeInternal)
 	if err != nil {
 		_, _ = fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 		os.Exit(1)

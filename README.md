@@ -23,34 +23,40 @@ go build -o gobreaker ./cmd/gobreaker
 ## Usage
 
 ```bash
-gobreaker [OPTIONS] <base-ref> [repo-path]
+gobreaker [OPTIONS]
 ```
-
-### Arguments
-
-- `base-ref` (required): The base reference to compare against (branch, tag, or commit SHA)
-- `repo-path` (optional): Path to the git repository (defaults to current directory)
 
 ### Options
 
-- `-o, --output <format>`: Output format - `text` (default), `json`, or `markdown`
+- `-o, --old <ref>`: Old reference (branch, tag, or commit) to compare from (required)
+- `-n, --new <ref>`: New reference (branch, tag, or commit) to compare to (default: HEAD)
+- `-r, --repo <path>`: Path to git repository (default: current directory)
+- `-f, --format <format>`: Output format - `text` (default), `json`, or `markdown`
+- `-i, --include-internal`: Include internal packages in API analysis
+- `-q, --quiet`: Suppress output
 - `-v, --version`: Print version information and exit
 - `-h, --help`: Show help message
 
 ### Examples
 
 ```bash
-# Compare current branch against main in current directory
-gobreaker main
+# Compare HEAD against main branch (skips internal packages by default)
+gobreaker --old main
 
-# Compare against a specific tag in a different repository
-gobreaker v1.0.0 /path/to/repo
+# Compare HEAD against main and include internal packages
+gobreaker --old main --include-internal
+
+# Compare specific commits
+gobreaker --old abc123 --new def456
+
+# Compare in a different repository
+gobreaker --old main --repo /path/to/repo
 
 # Output results as JSON
-gobreaker -o json main
+gobreaker --old main --format json
 
 # Output results as Markdown (useful for PR comments)
-gobreaker --output markdown main
+gobreaker --old main --format markdown
 
 # Check version
 gobreaker --version
@@ -77,7 +83,7 @@ gobreaker identifies various types of breaking changes including:
 - Interface method changes
 - Type definition changes
 
-**Note:** gobreaker analyzes **only exported (public) APIs** in all packages, including those in `internal/` directories. While internal packages cannot be imported from outside the module, they can have exported identifiers that are used within the module. Changes to these exported APIs are tracked to ensure internal API compatibility is maintained.
+**Note on Internal Packages:** By default, gobreaker skips internal packages (those with `/internal/` in their path). This is because internal packages are implementation details not meant to be used outside the module. However, if you want to track breaking changes in internal package public APIs (useful for maintaining internal API stability), use the `--include-internal` flag. When this flag is enabled, gobreaker analyzes **only the exported (public) APIs** of internal packages, just as it does for regular packages.
 
 ## Development
 
