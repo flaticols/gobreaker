@@ -6,6 +6,7 @@ import (
 	"runtime/debug"
 
 	"github.com/flaticols/gobreaker/internal/git"
+	"github.com/flaticols/gobreaker/pkg/breaking"
 	"github.com/jessevdk/go-flags"
 )
 
@@ -49,6 +50,7 @@ func main() {
 	if oldRef == "" {
 		_, _ = fmt.Fprintf(os.Stderr, "Error: old-ref is required\n")
 		_, _ = fmt.Fprintf(os.Stderr, "Usage: gobreaker [OPTIONS] <old-ref> [new-ref]\n")
+		_, _ = fmt.Fprintf(os.Stderr, "       gobreaker [OPTIONS] <old-path> <new-path>\n")
 		_, _ = fmt.Fprintf(os.Stderr, "Run 'gobreaker --help' for more information\n")
 		os.Exit(1)
 	}
@@ -64,12 +66,6 @@ func main() {
 			os.Exit(1)
 		}
 		programCfg.RepoPath = wd
-	} else {
-		err := os.Chdir(programCfg.RepoPath)
-		if err != nil {
-			_, _ = fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-			os.Exit(1)
-		}
 	}
 
 	if len(args) > 0 {
@@ -77,9 +73,30 @@ func main() {
 		os.Exit(1)
 	}
 
-	diff, err := git.OpenRepo(programCfg.RepoPath, oldRef, newRef, programCfg.IncludeInternal)
-	if err != nil {
-		_, _ = fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+	var diff *breaking.Diff
+
+	// Auto-detect: filesystem paths or git refs
+	oldIsPath := git.IsFilesystemPath(oldRef)
+	newIsPath := git.IsFilesystemPath(newRef)
+
+	if oldIsPath && newIsPath {
+		// Both are filesystem paths - compare directories directly
+		diff, err = git.CompareFilesystems(oldRef, newRef, programCfg.IncludeInternal)
+		if err != nil {
+			_, _ = fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+			os.Exit(1)
+		}
+	} else if !oldIsPath && !newIsPath {
+		// Both are git refs - use git mode
+		diff, err = git.OpenRepo(programCfg.RepoPath, oldRef, newRef, programCfg.IncludeInternal)
+		if err != nil {
+			_, _ = fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+			os.Exit(1)
+		}
+	} else {
+		// Mixed mode not supported
+		_, _ = fmt.Fprintf(os.Stderr, "Error: cannot mix filesystem paths and git refs\n")
+		_, _ = fmt.Fprintf(os.Stderr, "Use either two filesystem paths or two git refs\n")
 		os.Exit(1)
 	}
 

@@ -24,16 +24,19 @@ go build -o gobreaker ./cmd/gobreaker
 
 ```bash
 gobreaker [OPTIONS] <old-ref> [new-ref]
+gobreaker [OPTIONS] <old-path> <new-path>
 ```
+
+gobreaker automatically detects whether you're comparing git references or filesystem directories.
 
 ### Arguments
 
-- `old-ref` (required): Old reference (branch, tag, or commit) to compare from
-- `new-ref` (optional): New reference (branch, tag, or commit) to compare to (default: HEAD)
+- `old-ref` or `old-path` (required): Old git reference (branch, tag, or commit) or filesystem path to compare from
+- `new-ref` or `new-path` (optional): New git reference or filesystem path to compare to (default: HEAD for git mode)
 
 ### Options
 
-- `-r, --repo <path>`: Path to git repository (default: current directory)
+- `-r, --repo <path>`: Path to git repository (default: current directory, only used in git mode)
 - `-f, --format <format>`: Output format - `text` (default), `json`, or `markdown`
 - `-i, --include-internal`: Include internal packages in API analysis
 - `-q, --quiet`: Suppress output
@@ -41,6 +44,8 @@ gobreaker [OPTIONS] <old-ref> [new-ref]
 - `-h, --help`: Show help message
 
 ### Examples
+
+**Git mode** (compares commits without touching your current branch):
 
 ```bash
 # Compare HEAD against main branch (skips internal packages by default)
@@ -60,7 +65,24 @@ gobreaker main --repo /path/to/repo
 
 # Compare with a different repository and specific commits
 gobreaker abc123 def456 --repo /path/to/repo
+```
 
+**Filesystem mode** (compares directories directly):
+
+```bash
+# Compare two directories
+gobreaker /path/to/old /path/to/new
+
+# Compare with relative paths
+gobreaker ./v1 ./v2
+
+# Include internal packages when comparing directories
+gobreaker /old/version /new/version --include-internal
+```
+
+**General examples:**
+
+```bash
 # Output results as JSON
 gobreaker main --format json
 
