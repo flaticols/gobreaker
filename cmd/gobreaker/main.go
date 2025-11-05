@@ -13,13 +13,16 @@ type programOptions struct {
 	//nolint:golines
 	RepoPath string `short:"r" long:"repo" description:"Path to git repository (default: current directory)"`
 	//nolint:golines
-	OldRef string `short:"o" long:"old" description:"Old reference (branch, tag, or commit) to compare from, or 'latest' to compare latest against HEAD" required:"true"`
-	NewRef string `short:"n" long:"new" description:"New reference (branch, tag, or commit) to compare to" default:"HEAD"`
-	//nolint:golines
 	Output          string `short:"f" long:"format" description:"Output format (text, json, markdown)" default:"text" choice:"text"`
 	IncludeInternal bool   `short:"i" long:"include-internal" description:"Include internal packages in API analysis"`
 	Quite           bool   `short:"q" long:"quiet" description:"Suppress output"`
 	Version         bool   `short:"v" long:"version" description:"Print version information and exit"`
+
+	// Positional arguments
+	Args struct {
+		OldRef string `positional-arg-name:"old-ref" description:"Old reference (branch, tag, or commit) to compare from"`
+		NewRef string `positional-arg-name:"new-ref" description:"New reference (branch, tag, or commit) to compare to (default: HEAD)"`
+	} `positional-args:"yes"`
 }
 
 func main() {
@@ -37,6 +40,21 @@ func main() {
 	if programCfg.Version {
 		printVersion()
 		os.Exit(0)
+	}
+
+	// Handle positional arguments
+	oldRef := programCfg.Args.OldRef
+	newRef := programCfg.Args.NewRef
+
+	if oldRef == "" {
+		_, _ = fmt.Fprintf(os.Stderr, "Error: old-ref is required\n")
+		_, _ = fmt.Fprintf(os.Stderr, "Usage: gobreaker [OPTIONS] <old-ref> [new-ref]\n")
+		_, _ = fmt.Fprintf(os.Stderr, "Run 'gobreaker --help' for more information\n")
+		os.Exit(1)
+	}
+
+	if newRef == "" {
+		newRef = "HEAD"
 	}
 
 	if programCfg.RepoPath == "" {
@@ -59,7 +77,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	diff, err := git.OpenRepo(programCfg.RepoPath, programCfg.OldRef, programCfg.NewRef, programCfg.IncludeInternal)
+	diff, err := git.OpenRepo(programCfg.RepoPath, oldRef, newRef, programCfg.IncludeInternal)
 	if err != nil {
 		_, _ = fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 		os.Exit(1)

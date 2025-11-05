@@ -23,13 +23,16 @@ go build -o gobreaker ./cmd/gobreaker
 ## Usage
 
 ```bash
-gobreaker [OPTIONS]
+gobreaker [OPTIONS] <old-ref> [new-ref]
 ```
+
+### Arguments
+
+- `old-ref` (required): Old reference (branch, tag, or commit) to compare from
+- `new-ref` (optional): New reference (branch, tag, or commit) to compare to (default: HEAD)
 
 ### Options
 
-- `-o, --old <ref>`: Old reference (branch, tag, or commit) to compare from (required)
-- `-n, --new <ref>`: New reference (branch, tag, or commit) to compare to (default: HEAD)
 - `-r, --repo <path>`: Path to git repository (default: current directory)
 - `-f, --format <format>`: Output format - `text` (default), `json`, or `markdown`
 - `-i, --include-internal`: Include internal packages in API analysis
@@ -41,22 +44,28 @@ gobreaker [OPTIONS]
 
 ```bash
 # Compare HEAD against main branch (skips internal packages by default)
-gobreaker --old main
+gobreaker main
+
+# Compare main branch against develop branch
+gobreaker main develop
 
 # Compare HEAD against main and include internal packages
-gobreaker --old main --include-internal
+gobreaker main --include-internal
 
 # Compare specific commits
-gobreaker --old abc123 --new def456
+gobreaker abc123 def456
 
 # Compare in a different repository
-gobreaker --old main --repo /path/to/repo
+gobreaker main --repo /path/to/repo
+
+# Compare with a different repository and specific commits
+gobreaker abc123 def456 --repo /path/to/repo
 
 # Output results as JSON
-gobreaker --old main --format json
+gobreaker main --format json
 
 # Output results as Markdown (useful for PR comments)
-gobreaker --old main --format markdown
+gobreaker main --format markdown
 
 # Check version
 gobreaker --version
