@@ -23,34 +23,71 @@ go build -o gobreaker ./cmd/gobreaker
 ## Usage
 
 ```bash
-gobreaker [OPTIONS] <base-ref> [repo-path]
+gobreaker [OPTIONS] <old-ref> [new-ref]
+gobreaker [OPTIONS] <old-path> <new-path>
 ```
+
+gobreaker automatically detects whether you're comparing git references or filesystem directories.
 
 ### Arguments
 
-- `base-ref` (required): The base reference to compare against (branch, tag, or commit SHA)
-- `repo-path` (optional): Path to the git repository (defaults to current directory)
+- `old-ref` or `old-path` (required): Old git reference (branch, tag, or commit) or filesystem path to compare from
+- `new-ref` or `new-path` (optional): New git reference or filesystem path to compare to (default: HEAD for git mode)
 
 ### Options
 
-- `-o, --output <format>`: Output format - `text` (default), `json`, or `markdown`
+- `-r, --repo <path>`: Path to git repository (default: current directory, only used in git mode)
+- `-f, --format <format>`: Output format - `text` (default), `json`, or `markdown`
+- `-i, --include-internal`: Include internal packages in API analysis
+- `-q, --quiet`: Suppress output
 - `-v, --version`: Print version information and exit
 - `-h, --help`: Show help message
 
 ### Examples
 
+**Git mode** (compares commits without touching your current branch):
+
 ```bash
-# Compare current branch against main in current directory
+# Compare HEAD against main branch (skips internal packages by default)
 gobreaker main
 
-# Compare against a specific tag in a different repository
-gobreaker v1.0.0 /path/to/repo
+# Compare main branch against develop branch
+gobreaker main develop
 
+# Compare HEAD against main and include internal packages
+gobreaker main --include-internal
+
+# Compare specific commits
+gobreaker abc123 def456
+
+# Compare in a different repository
+gobreaker main --repo /path/to/repo
+
+# Compare with a different repository and specific commits
+gobreaker abc123 def456 --repo /path/to/repo
+```
+
+**Filesystem mode** (compares directories directly):
+
+```bash
+# Compare two directories
+gobreaker /path/to/old /path/to/new
+
+# Compare with relative paths
+gobreaker ./v1 ./v2
+
+# Include internal packages when comparing directories
+gobreaker /old/version /new/version --include-internal
+```
+
+**General examples:**
+
+```bash
 # Output results as JSON
-gobreaker -o json main
+gobreaker main --format json
 
 # Output results as Markdown (useful for PR comments)
-gobreaker --output markdown main
+gobreaker main --format markdown
 
 # Check version
 gobreaker --version
@@ -76,6 +113,8 @@ gobreaker identifies various types of breaking changes including:
 - Removed or changed struct fields
 - Interface method changes
 - Type definition changes
+
+**Note on Internal Packages:** By default, gobreaker skips internal packages (those with `/internal/` in their path). This is because internal packages are implementation details not meant to be used outside the module. However, if you want to track breaking changes in internal package public APIs (useful for maintaining internal API stability), use the `--include-internal` flag. When this flag is enabled, gobreaker analyzes **only the exported (public) APIs** of internal packages, just as it does for regular packages.
 
 ## Development
 

@@ -74,27 +74,21 @@ func getHashes(repo *git.Repository, oldRev, newRev plumbing.Revision) (*plumbin
 	return oldCommitHash, newCommitHash, nil
 }
 
-func getPackages(wt git.Worktree, hash plumbing.Hash) (map[string]*packages.Package, map[string]*packages.Package, error) {
-	if err := wt.Checkout(&git.CheckoutOptions{Hash: hash, Force: true}); err != nil {
-		return nil, nil, err
-	}
-	if err := wt.Clean(&git.CleanOptions{Dir: true}); err != nil {
-		return nil, nil, err
-	}
-	if err := wt.Reset(&git.ResetOptions{Commit: hash, Mode: git.HardReset}); err != nil {
-		return nil, nil, err
-	}
-
+func getPackagesFromPath(path string, includeInternal bool) (map[string]*packages.Package, map[string]*packages.Package, error) {
+	// Determine go flags
 	goFlags := "-mod=readonly"
-	if st, err := os.Stat(filepath.Join(wt.Filesystem.Root(), "vendor")); err == nil && st.IsDir() {
+	if st, err := os.Stat(filepath.Join(path, "vendor")); err == nil && st.IsDir() {
 		goFlags = "-mod=vendor"
 	}
+
 	cfg := packages.Config{
 		Mode: packages.NeedName | packages.NeedFiles | packages.NeedCompiledGoFiles |
 			packages.NeedImports | packages.NeedTypes | packages.NeedTypesSizes,
 		Tests:      false,
 		BuildFlags: []string{goFlags},
+		Dir:        path,
 	}
+
 	pkgs, err := packages.Load(&cfg, "./...")
 	if err != nil {
 		return nil, nil, err
@@ -103,8 +97,10 @@ func getPackages(wt git.Worktree, hash plumbing.Hash) (map[string]*packages.Pack
 	selfPkgs := make(map[string]*packages.Package)
 	importPkgs := make(map[string]*packages.Package)
 	for _, pkg := range pkgs {
-		// skip internal packages since they do not contain public APIs
-		if strings.HasSuffix(pkg.PkgPath, "/internal") || strings.Contains(pkg.PkgPath, "/internal/") {
+		// Skip internal packages by default unless includeInternal flag is set.
+		// Internal packages are those with "/internal/" in their path or ending with "/internal".
+		// When includeInternal is true, all packages are analyzed for their public APIs.
+		if !includeInternal && (strings.HasSuffix(pkg.PkgPath, "/internal") || strings.Contains(pkg.PkgPath, "/internal/")) {
 			continue
 		}
 		selfPkgs[pkg.PkgPath] = pkg
@@ -117,14 +113,22 @@ func getPackages(wt git.Worktree, hash plumbing.Hash) (map[string]*packages.Pack
 		}
 	}
 
-	if err := wt.Reset(&git.ResetOptions{
-		Mode:   git.HardReset,
-		Commit: hash,
-	}); err != nil {
-		return nil, nil, fmt.Errorf("failed to hard reset to %v: %w", hash, err)
+	return selfPkgs, importPkgs, nil
+}
+
+func getPackages(wt git.Worktree, hash plumbing.Hash, includeInternal bool) (map[string]*packages.Package, map[string]*packages.Package, error) {
+	if err := wt.Checkout(&git.CheckoutOptions{Hash: hash, Force: true}); err != nil {
+		return nil, nil, err
+	}
+	if err := wt.Clean(&git.CleanOptions{Dir: true}); err != nil {
+		return nil, nil, err
+	}
+	if err := wt.Reset(&git.ResetOptions{Commit: hash, Mode: git.HardReset}); err != nil {
+		return nil, nil, err
 	}
 
-	return selfPkgs, importPkgs, nil
+	path := wt.Filesystem.Root()
+	return getPackagesFromPath(path, includeInternal)
 }
 
 func checkoutRef(wt git.Worktree, ref plumbing.Reference) (err error) {
