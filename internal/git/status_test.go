@@ -296,3 +296,334 @@ func TestApidiffOnlyAnalyzesExportedIdentifiers(t *testing.T) {
 		}
 	}
 }
+
+// TestComparePackages_StructTypeChanges tests detection of struct type changes.
+func TestComparePackages_StructTypeChanges(t *testing.T) {
+	// Create old package with a struct type
+	oldPkg := types.NewPackage("github.com/example/internal/models", "models")
+	fields := []*types.Var{
+		types.NewField(0, oldPkg, "Name", types.Typ[types.String], false),
+		types.NewField(0, oldPkg, "Age", types.Typ[types.Int], false),
+	}
+	oldStruct := types.NewStruct(fields, nil)
+	oldType := types.NewNamed(types.NewTypeName(0, oldPkg, "User", nil), oldStruct, nil)
+	oldPkg.Scope().Insert(oldType.Obj())
+
+	oldPkgs := map[string]*packages.Package{
+		"github.com/example/internal/models": {
+			PkgPath: "github.com/example/internal/models",
+			Name:    "models",
+			Types:   oldPkg,
+		},
+	}
+
+	// Create new package with modified struct (removed Age field - breaking change)
+	newPkg := types.NewPackage("github.com/example/internal/models", "models")
+	newFields := []*types.Var{
+		types.NewField(0, newPkg, "Name", types.Typ[types.String], false),
+	}
+	newStruct := types.NewStruct(newFields, nil)
+	newType := types.NewNamed(types.NewTypeName(0, newPkg, "User", nil), newStruct, nil)
+	newPkg.Scope().Insert(newType.Obj())
+
+	newPkgs := map[string]*packages.Package{
+		"github.com/example/internal/models": {
+			PkgPath: "github.com/example/internal/models",
+			Name:    "models",
+			Types:   newPkg,
+		},
+	}
+
+	reports, incompatible := compareImports(oldPkgs, newPkgs)
+
+	if !incompatible {
+		t.Error("Expected incompatible=true when struct field is removed")
+	}
+
+	if len(reports["github.com/example/internal/models"].Changes) == 0 {
+		t.Error("Expected changes to be detected for struct modification")
+	}
+}
+
+// TestComparePackages_InterfaceChanges tests detection of interface changes.
+func TestComparePackages_InterfaceChanges(t *testing.T) {
+	// Create old package with an interface
+	oldPkg := types.NewPackage("github.com/example/internal/api", "api")
+	sig1 := types.NewSignatureType(nil, nil, nil, nil, nil, false)
+	method1 := types.NewFunc(0, oldPkg, "Method1", sig1)
+
+	oldInterface := types.NewInterfaceType([]*types.Func{method1}, nil)
+	oldType := types.NewNamed(types.NewTypeName(0, oldPkg, "Interface", nil), oldInterface, nil)
+	oldPkg.Scope().Insert(oldType.Obj())
+
+	oldPkgs := map[string]*packages.Package{
+		"github.com/example/internal/api": {
+			PkgPath: "github.com/example/internal/api",
+			Name:    "api",
+			Types:   oldPkg,
+		},
+	}
+
+	// Create new package with additional method in interface (breaking change for implementers)
+	newPkg := types.NewPackage("github.com/example/internal/api", "api")
+	sig2 := types.NewSignatureType(nil, nil, nil, nil, nil, false)
+	newMethod1 := types.NewFunc(0, newPkg, "Method1", sig2)
+	newMethod2 := types.NewFunc(0, newPkg, "Method2", sig2)
+
+	newInterface := types.NewInterfaceType([]*types.Func{newMethod1, newMethod2}, nil)
+	newType := types.NewNamed(types.NewTypeName(0, newPkg, "Interface", nil), newInterface, nil)
+	newPkg.Scope().Insert(newType.Obj())
+
+	newPkgs := map[string]*packages.Package{
+		"github.com/example/internal/api": {
+			PkgPath: "github.com/example/internal/api",
+			Name:    "api",
+			Types:   newPkg,
+		},
+	}
+
+	reports, incompatible := compareImports(oldPkgs, newPkgs)
+
+	if !incompatible {
+		t.Error("Expected incompatible=true when interface method is added")
+	}
+
+	if len(reports["github.com/example/internal/api"].Changes) == 0 {
+		t.Error("Expected changes to be detected for interface modification")
+	}
+}
+
+// TestComparePackages_ConstantAndVariableChanges tests detection of const/var changes.
+func TestComparePackages_ConstantAndVariableChanges(t *testing.T) {
+	// Create old package with exported constant
+	oldPkg := types.NewPackage("github.com/example/internal/config", "config")
+	oldConst := types.NewConst(0, oldPkg, "MaxRetries", types.Typ[types.Int], nil)
+	oldPkg.Scope().Insert(oldConst)
+
+	oldPkgs := map[string]*packages.Package{
+		"github.com/example/internal/config": {
+			PkgPath: "github.com/example/internal/config",
+			Name:    "config",
+			Types:   oldPkg,
+		},
+	}
+
+	// Create new package without the constant (breaking change)
+	newPkg := types.NewPackage("github.com/example/internal/config", "config")
+	newPkgs := map[string]*packages.Package{
+		"github.com/example/internal/config": {
+			PkgPath: "github.com/example/internal/config",
+			Name:    "config",
+			Types:   newPkg,
+		},
+	}
+
+	reports, incompatible := compareImports(oldPkgs, newPkgs)
+
+	if !incompatible {
+		t.Error("Expected incompatible=true when exported constant is removed")
+	}
+
+	if len(reports["github.com/example/internal/config"].Changes) == 0 {
+		t.Error("Expected changes to be detected for constant removal")
+	}
+}
+
+// TestComparePackages_MethodChanges tests detection of method changes on types.
+func TestComparePackages_MethodChanges(t *testing.T) {
+	// Create old package with a type and method
+	oldPkg := types.NewPackage("github.com/example/internal/service", "service")
+	oldStruct := types.NewStruct(nil, nil)
+	oldType := types.NewNamed(types.NewTypeName(0, oldPkg, "Service", nil), oldStruct, nil)
+
+	// Add method to the type
+	sig := types.NewSignatureType(types.NewVar(0, oldPkg, "", oldType), nil, nil, nil, nil, false)
+	method := types.NewFunc(0, oldPkg, "Start", sig)
+	oldType.AddMethod(method)
+
+	oldPkg.Scope().Insert(oldType.Obj())
+
+	oldPkgs := map[string]*packages.Package{
+		"github.com/example/internal/service": {
+			PkgPath: "github.com/example/internal/service",
+			Name:    "service",
+			Types:   oldPkg,
+		},
+	}
+
+	// Create new package without the method (breaking change)
+	newPkg := types.NewPackage("github.com/example/internal/service", "service")
+	newStruct := types.NewStruct(nil, nil)
+	newType := types.NewNamed(types.NewTypeName(0, newPkg, "Service", nil), newStruct, nil)
+	newPkg.Scope().Insert(newType.Obj())
+
+	newPkgs := map[string]*packages.Package{
+		"github.com/example/internal/service": {
+			PkgPath: "github.com/example/internal/service",
+			Name:    "service",
+			Types:   newPkg,
+		},
+	}
+
+	reports, incompatible := compareImports(oldPkgs, newPkgs)
+
+	if !incompatible {
+		t.Error("Expected incompatible=true when method is removed from type")
+	}
+
+	if len(reports["github.com/example/internal/service"].Changes) == 0 {
+		t.Error("Expected changes to be detected for method removal")
+	}
+}
+
+// TestComparePackages_NewPackageAdded tests adding a new package (compatible change).
+func TestComparePackages_NewPackageAdded(t *testing.T) {
+	// Old packages - empty
+	oldPkgs := map[string]*packages.Package{}
+
+	// New package added
+	newPkg := types.NewPackage("github.com/example/internal/newpkg", "newpkg")
+	sig := types.NewSignatureType(nil, nil, nil, nil, nil, false)
+	newFunc := types.NewFunc(0, newPkg, "NewFunction", sig)
+	newPkg.Scope().Insert(newFunc)
+
+	newPkgs := map[string]*packages.Package{
+		"github.com/example/internal/newpkg": {
+			PkgPath: "github.com/example/internal/newpkg",
+			Name:    "newpkg",
+			Types:   newPkg,
+		},
+	}
+
+	reports, incompatible := compareImports(oldPkgs, newPkgs)
+
+	// Adding a new package is compatible
+	if incompatible {
+		t.Error("Expected incompatible=false when new package is added")
+	}
+
+	// Should have a report for the new package
+	if _, ok := reports["github.com/example/internal/newpkg"]; !ok {
+		t.Error("Expected report for new package")
+	}
+}
+
+// TestComparePackages_MixedCompatibleAndIncompatible tests a scenario with
+// both compatible and incompatible changes across multiple packages.
+func TestComparePackages_MixedCompatibleAndIncompatible(t *testing.T) {
+	// Create old packages
+	oldPkg1 := types.NewPackage("github.com/example/internal/pkg1", "pkg1")
+	sig := types.NewSignatureType(nil, nil, nil, nil, nil, false)
+	oldFunc1 := types.NewFunc(0, oldPkg1, "Func1", sig)
+	oldPkg1.Scope().Insert(oldFunc1)
+
+	oldPkg2 := types.NewPackage("github.com/example/internal/pkg2", "pkg2")
+	oldFunc2 := types.NewFunc(0, oldPkg2, "Func2", sig)
+	oldPkg2.Scope().Insert(oldFunc2)
+
+	oldPkgs := map[string]*packages.Package{
+		"github.com/example/internal/pkg1": {
+			PkgPath: "github.com/example/internal/pkg1",
+			Name:    "pkg1",
+			Types:   oldPkg1,
+		},
+		"github.com/example/internal/pkg2": {
+			PkgPath: "github.com/example/internal/pkg2",
+			Name:    "pkg2",
+			Types:   oldPkg2,
+		},
+	}
+
+	// Create new packages
+	// pkg1: compatible change (add new function)
+	newPkg1 := types.NewPackage("github.com/example/internal/pkg1", "pkg1")
+	newFunc1 := types.NewFunc(0, newPkg1, "Func1", sig)
+	newFunc1b := types.NewFunc(0, newPkg1, "NewFunc", sig)
+	newPkg1.Scope().Insert(newFunc1)
+	newPkg1.Scope().Insert(newFunc1b)
+
+	// pkg2: incompatible change (remove function)
+	newPkg2 := types.NewPackage("github.com/example/internal/pkg2", "pkg2")
+
+	newPkgs := map[string]*packages.Package{
+		"github.com/example/internal/pkg1": {
+			PkgPath: "github.com/example/internal/pkg1",
+			Name:    "pkg1",
+			Types:   newPkg1,
+		},
+		"github.com/example/internal/pkg2": {
+			PkgPath: "github.com/example/internal/pkg2",
+			Name:    "pkg2",
+			Types:   newPkg2,
+		},
+	}
+
+	reports, incompatible := compareImports(oldPkgs, newPkgs)
+
+	// Should be incompatible overall because pkg2 has breaking change
+	if !incompatible {
+		t.Error("Expected incompatible=true when one package has breaking changes")
+	}
+
+	// Should have reports for both packages
+	if len(reports) != 2 {
+		t.Errorf("Expected reports for 2 packages, got %d", len(reports))
+	}
+
+	// pkg1 should have changes but all compatible
+	pkg1Report := reports["github.com/example/internal/pkg1"]
+	for _, change := range pkg1Report.Changes {
+		if !change.Compatible {
+			t.Error("Expected all changes in pkg1 to be compatible")
+		}
+	}
+
+	// pkg2 should have incompatible changes
+	pkg2Report := reports["github.com/example/internal/pkg2"]
+	foundIncompatible := false
+	for _, change := range pkg2Report.Changes {
+		if !change.Compatible {
+			foundIncompatible = true
+			break
+		}
+	}
+	if !foundIncompatible {
+		t.Error("Expected pkg2 to have incompatible changes")
+	}
+}
+
+// TestComparePackages_TypeAliasChanges tests detection of type alias changes.
+func TestComparePackages_TypeAliasChanges(t *testing.T) {
+	// Create old package with type alias
+	oldPkg := types.NewPackage("github.com/example/internal/types", "types")
+	oldAlias := types.NewTypeName(0, oldPkg, "MyInt", types.Typ[types.Int])
+	oldPkg.Scope().Insert(oldAlias)
+
+	oldPkgs := map[string]*packages.Package{
+		"github.com/example/internal/types": {
+			PkgPath: "github.com/example/internal/types",
+			Name:    "types",
+			Types:   oldPkg,
+		},
+	}
+
+	// Create new package without the type alias (breaking change)
+	newPkg := types.NewPackage("github.com/example/internal/types", "types")
+	newPkgs := map[string]*packages.Package{
+		"github.com/example/internal/types": {
+			PkgPath: "github.com/example/internal/types",
+			Name:    "types",
+			Types:   newPkg,
+		},
+	}
+
+	reports, incompatible := compareImports(oldPkgs, newPkgs)
+
+	if !incompatible {
+		t.Error("Expected incompatible=true when type alias is removed")
+	}
+
+	if len(reports["github.com/example/internal/types"].Changes) == 0 {
+		t.Error("Expected changes to be detected for type alias removal")
+	}
+}
