@@ -77,6 +77,8 @@ gobreaker identifies various types of breaking changes including:
 - Interface method changes
 - Type definition changes
 
+**Note:** gobreaker analyzes **only exported (public) APIs** in all packages, including those in `internal/` directories. While internal packages cannot be imported from outside the module, they can have exported identifiers that are used within the module. Changes to these exported APIs are tracked to ensure internal API compatibility is maintained.
+
 ## Development
 
 ### Building
