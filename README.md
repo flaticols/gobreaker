@@ -91,6 +91,37 @@ go build -o gobreaker ./cmd/gobreaker
 go test ./...
 ```
 
+## Claude Code Plugin
+
+gobreaker is also available as a [Claude Code](https://claude.ai/code) plugin, bringing breaking-change detection directly into your AI-assisted workflow.
+
+### Install from marketplace
+
+```
+/plugin marketplace add flaticols/gobreaker
+/plugin install gobreaker
+```
+
+### Usage
+
+```
+# Compare default branch vs working directory
+/gobreaker:check
+
+# Compare a specific tag against working directory
+/gobreaker:check v0.0.1
+
+# Compare two git refs
+/gobreaker:check v0.0.1 v0.0.2
+
+# Compare filesystem paths
+/gobreaker:check -p /old/pkg /new/pkg
+```
+
+The skill runs `gobreaker` on your Go project and returns a structured summary: compatible/breaking status, list of changes, semver bump recommendation, and migration hints.
+
+> **Note**: The `gobreaker` binary must be in your `PATH`. Install it with `go install github.com/flaticols/gobreaker/cmd/gobreaker@latest`.
+
 ## License
 
 See [LICENSE](LICENSE) file for details.

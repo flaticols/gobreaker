@@ -6,7 +6,7 @@ description: >
   comparing two git refs or tags, or auditing Go API modifications.
   Triggers on: "check breaking changes", "API compatibility", "is this a breaking change",
   "compare API", "gobreaker".
-allowed-tools: Bash(gobreaker *), Bash(go install *), Bash(which gobreaker), Read, Grep, Glob
+allowed-tools: Bash(gobreaker *), Bash(which gobreaker), Read, Grep, Glob
 argument-hint: "[old-ref] [new-ref]  — defaults to default-branch vs working dir"
 ---
 
@@ -16,11 +16,17 @@ Detect breaking changes in the current Go project using `gobreaker`.
 
 ## Prerequisites
 
-Ensure gobreaker is installed:
+Check that gobreaker is installed:
 
 ```bash
-which gobreaker || go install github.com/flaticols/gobreaker/cmd/gobreaker@latest
+which gobreaker
 ```
+
+If not found, stop and tell the user to install it first:
+```
+go install github.com/flaticols/gobreaker/cmd/gobreaker@latest
+```
+Do NOT install it automatically.
 
 ## Analysis
 
