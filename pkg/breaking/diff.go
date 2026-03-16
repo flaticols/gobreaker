@@ -20,10 +20,10 @@ type Diff struct {
 	incompatible     bool
 }
 
-func New(apiCHanges, importCHanges DiffReport) *Diff {
+func New(apiChanges, importChanges DiffReport) *Diff {
 	return &Diff{
-		apiChangeReports: apiCHanges,
-		importsChange:    importCHanges,
+		apiChangeReports: apiChanges,
+		importsChange:    importChanges,
 	}
 }
 
@@ -41,29 +41,43 @@ func (d *Diff) IsCompatible() bool {
 	return !d.breakingImports && !d.incompatible
 }
 
-// Reports writes all API diff reports to stdout with proper formatting.
-// It includes both package reports and import reports, showing both
-// compatible and incompatible changes.
-func (d *Diff) Reports() error {
-	w := &TextDiffReport{prefix: "  ", w: os.Stdout}
+// HasChanges returns true if any API changes (compatible or incompatible) were detected.
+func (d *Diff) HasChanges() bool {
+	for _, r := range d.apiChangeReports {
+		if len(r.Changes) > 0 {
+			return true
+		}
+	}
+	for _, r := range d.importsChange {
+		if len(r.Changes) > 0 {
+			return true
+		}
+	}
+	return false
+}
+
+// WriteText writes all API diff reports to the given writer with proper formatting.
+func (d *Diff) WriteText(out io.Writer) error {
+	w := &TextDiffReport{prefix: "  ", w: out}
 	for pkg, report := range d.apiChangeReports {
-		err := writeReport(w, pkg, report)
-		if err != nil {
+		if err := writeReport(out, w, pkg, report); err != nil {
 			return err
 		}
 	}
-
 	for pkg, report := range d.importsChange {
-		err := writeReport(w, pkg, report)
-		if err != nil {
+		if err := writeReport(out, w, pkg, report); err != nil {
 			return err
 		}
 	}
-
 	return nil
 }
 
-func writeReport(w io.Writer, name string, report apidiff.Report) error {
+// Reports writes all API diff reports to stdout.
+func (d *Diff) Reports() error {
+	return d.WriteText(os.Stdout)
+}
+
+func writeReport(out, w io.Writer, name string, report apidiff.Report) error {
 	var (
 		hasIncompatible bool
 		hasCompatible   bool
@@ -78,17 +92,16 @@ func writeReport(w io.Writer, name string, report apidiff.Report) error {
 	}
 
 	if hasIncompatible {
-		if _, err := fmt.Fprintf(os.Stdout, "\n%s\n", name); err != nil {
+		if _, err := fmt.Fprintf(out, "\n%s\n", name); err != nil {
 			return err
 		}
-
 		if err := report.TextIncompatible(w, true); err != nil {
 			return err
 		}
 	}
 
 	if hasCompatible {
-		if _, err := fmt.Fprintf(os.Stdout, "\n%s\n", name); err != nil {
+		if _, err := fmt.Fprintf(out, "\n%s\n", name); err != nil {
 			return err
 		}
 		if err := report.TextCompatible(w); err != nil {
