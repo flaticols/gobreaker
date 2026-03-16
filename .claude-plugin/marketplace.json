@@ -1,0 +1,14 @@
+{
+  "name": "flaticols-gobreaker",
+  "description": "Go API breaking change detection plugins",
+  "plugins": [
+    {
+      "name": "gobreaker",
+      "description": "Detect breaking changes in Go public APIs between git refs or filesystem paths",
+      "source": {
+        "type": "git",
+        "url": "https://github.com/flaticols/gobreaker"
+      }
+    }
+  ]
+}

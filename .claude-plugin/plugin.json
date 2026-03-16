@@ -1,0 +1,14 @@
+{
+  "name": "gobreaker",
+  "description": "Detect breaking changes in Go public APIs. Compares git refs or filesystem paths and reports incompatible/compatible changes using golang.org/x/exp/apidiff.",
+  "version": "0.0.1",
+  "author": {
+    "name": "flaticols"
+  },
+  "homepage": "https://github.com/flaticols/gobreaker",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/flaticols/gobreaker"
+  },
+  "license": "MIT"
+}
