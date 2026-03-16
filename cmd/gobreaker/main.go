@@ -5,28 +5,28 @@ import (
 	"os"
 	"runtime/debug"
 
-	"github.com/flaticols/gobreaker/internal/git"
+	"github.com/flaticols/gobreaker"
 	"github.com/jessevdk/go-flags"
 )
 
 type programOptions struct {
-	//nolint:golines
-	RepoPath string `short:"r" long:"repo" description:"Path to git repository (default: current directory)"`
-	//nolint:golines
-	OldRef string `short:"o" long:"old" description:"Old reference (branch, tag, or commit) to compare from, or 'latest' to compare latest against HEAD" required:"true"`
-	NewRef string `short:"n" long:"new" description:"New reference (branch, tag, or commit) to compare to" default:"HEAD"`
-	//nolint:golines
-	Output  string `short:"f" long:"format" description:"Output format (text, json, markdown)" default:"text" choice:"text"`
-	Quite   bool   `short:"q" long:"quiet" description:"Suppress output"`
-	Version bool   `short:"v" long:"version" description:"Print version information and exit"`
+	Path            bool   `short:"p" long:"path" description:"Interpret arguments as filesystem paths"`
+	IncludeInternal bool   `short:"i" long:"include-internal" description:"Include internal packages in API analysis"`
+	RepoPath        string `short:"r" long:"repo" description:"Path to git repository (default: current directory)"`
+	Output          string `short:"f" long:"format" description:"Output format" default:"text" choice:"text"`
+	Quiet           bool   `short:"q" long:"quiet" description:"Suppress output"`
+	Version         bool   `short:"v" long:"version" description:"Print version information and exit"`
+	Args            struct {
+		A string `positional-arg-name:"base"`
+		B string `positional-arg-name:"target"`
+	} `positional-args:"yes"`
 }
 
 func main() {
 	programCfg := programOptions{}
 	p := flags.NewParser(&programCfg, flags.Default)
 
-	args, err := p.Parse()
-	if err != nil {
+	if _, err := p.Parse(); err != nil {
 		if e, ok := err.(*flags.Error); ok && e.Type == flags.ErrHelp {
 			os.Exit(0)
 		}
@@ -38,45 +38,63 @@ func main() {
 		os.Exit(0)
 	}
 
-	if programCfg.RepoPath == "" {
-		wd, err := os.Getwd()
-		if err != nil {
-			_, _ = fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+	var (
+		report *gobreaker.Report
+		err    error
+	)
+
+	if programCfg.Path {
+		if programCfg.Args.A == "" {
+			_, _ = fmt.Fprintf(os.Stderr, "Error: base path argument is required in --path mode\n")
 			os.Exit(1)
 		}
-		programCfg.RepoPath = wd
+		newPath := programCfg.Args.B
+		if newPath == "" {
+			newPath, err = os.Getwd()
+			if err != nil {
+				_, _ = fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+				os.Exit(1)
+			}
+		}
+		report, err = gobreaker.CompareFilesystems(programCfg.Args.A, newPath, programCfg.IncludeInternal)
 	} else {
-		err := os.Chdir(programCfg.RepoPath)
-		if err != nil {
-			_, _ = fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-			os.Exit(1)
+		repoPath := programCfg.RepoPath
+		if repoPath == "" {
+			repoPath, err = os.Getwd()
+			if err != nil {
+				_, _ = fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+				os.Exit(1)
+			}
 		}
+
+		oldRef := programCfg.Args.A
+		if oldRef == "" {
+			oldRef, err = gobreaker.DetectDefaultBranch(repoPath)
+			if err != nil {
+				_, _ = fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+				os.Exit(1)
+			}
+			fmt.Printf("Comparing against default branch: %s\n", oldRef)
+		}
+
+		report, err = gobreaker.CompareRefs(repoPath, oldRef, programCfg.Args.B, programCfg.IncludeInternal)
 	}
 
-	if len(args) > 0 {
-		_, _ = fmt.Fprintf(os.Stderr, "Error: unexpected arguments: %v\n", args)
-		os.Exit(1)
-	}
-
-	diff, err := git.OpenRepo(programCfg.RepoPath, programCfg.OldRef, programCfg.NewRef)
 	if err != nil {
 		_, _ = fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 		os.Exit(1)
 	}
 
-	if !programCfg.Quite {
-		err = diff.Reports()
-		if err != nil {
+	if !programCfg.Quiet {
+		if err := report.WriteText(os.Stdout); err != nil {
 			_, _ = fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 			os.Exit(1)
 		}
 	}
 
-	if !diff.IsCompatible() {
+	if !report.IsCompatible() {
 		os.Exit(1)
 	}
-
-	os.Exit(0)
 }
 
 func printVersion() {

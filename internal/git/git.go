@@ -2,72 +2,26 @@ package git
 
 import (
 	"fmt"
+	"os"
+	"os/exec"
+	"strings"
 
 	"github.com/flaticols/gobreaker/pkg/breaking"
-	"github.com/go-git/go-billy/v5/osfs"
 	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/plumbing"
-	"github.com/go-git/go-git/v5/plumbing/format/gitignore"
 )
 
-// OpenRepo compares API differences between two commits in a Git repository.
-// It returns a Diff report with details on compatibility and breaking changes.
-func OpenRepo(repoPath, oldCommit, newCommit string) (*breaking.Diff, error) {
-	repo, err := git.PlainOpen(repoPath)
+// CompareFilesystems compares API differences between two filesystem directories.
+// No git operations are performed — pure filesystem comparison.
+func CompareFilesystems(oldPath, newPath string, includeInternal bool) (*breaking.Diff, error) {
+	selfOld, importsOld, err := getPackagesFromPath(oldPath, includeInternal)
 	if err != nil {
-		return nil, fmt.Errorf("failed to open repository at %s: %w", repoPath, err)
+		return nil, fmt.Errorf("failed to get packages from %s: %w", oldPath, err)
 	}
 
-	wt, err := repo.Worktree()
+	selfNew, importsNew, err := getPackagesFromPath(newPath, includeInternal)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get worktree: %w", err)
-	}
-
-	wt.Filesystem = osfs.New(repoPath)
-	rootFS := osfs.New("/")
-
-	globalIgnoreFile, err := gitignore.LoadGlobalPatterns(rootFS)
-	if err != nil {
-		return nil, fmt.Errorf("failed to load gitignore: %v", err)
-	}
-	wt.Excludes = append(wt.Excludes, globalIgnoreFile...)
-
-	sysIgnoreFile, err := gitignore.LoadSystemPatterns(rootFS)
-	if err != nil {
-		return nil, fmt.Errorf("failed to load system gitignore: %v", err)
-	}
-	wt.Excludes = append(wt.Excludes, sysIgnoreFile...)
-
-	if stat, err := wt.Status(); err != nil {
-		return nil, fmt.Errorf("failed to get git status: %w", err)
-	} else if !stat.IsClean() {
-		return nil, &StatusError{stat, fmt.Errorf("current git tree is dirty")}
-	}
-
-	origRef, err := repo.Head()
-	if err != nil {
-		return nil, fmt.Errorf("failed to get current HEAD reference: %w", err)
-	}
-
-	oldHash, newHash, err := getHashes(repo, plumbing.Revision(oldCommit), plumbing.Revision(newCommit))
-	if err != nil {
-		return nil, fmt.Errorf("failed to lookup git commit hashes: %w", err)
-	}
-
-	defer func() {
-		if err := checkoutRef(*wt, *origRef); err != nil {
-			fmt.Printf("WARNING: failed to checkout your original working commit after diff: %v\n", err)
-		}
-	}()
-
-	selfOld, importsOld, err := getPackages(*wt, *oldHash)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get packages from old commit %q (%s): %w", oldCommit, oldHash, err)
-	}
-
-	selfNew, importsNew, err := getPackages(*wt, *newHash)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get packages from new commit %q (%s): %w", newCommit, newHash, err)
+		return nil, fmt.Errorf("failed to get packages from %s: %w", newPath, err)
 	}
 
 	apiReports, incompatible := comparePackages(selfOld, selfNew)
@@ -78,4 +32,75 @@ func OpenRepo(repoPath, oldCommit, newCommit string) (*breaking.Diff, error) {
 	d.SetIncompatible(incompatible)
 
 	return d, nil
+}
+
+// DetectDefaultBranch attempts to detect the default branch of a git repository.
+func DetectDefaultBranch(repoPath string) (string, error) {
+	repo, err := git.PlainOpen(repoPath)
+	if err != nil {
+		return "", fmt.Errorf("failed to open repository at %s: %w", repoPath, err)
+	}
+
+	// Try refs/remotes/origin/HEAD
+	ref, err := repo.Reference(plumbing.ReferenceName("refs/remotes/origin/HEAD"), false)
+	if err == nil && ref.Type() == plumbing.SymbolicReference {
+		target := ref.Target().Short()
+		if branch, ok := strings.CutPrefix(target, "origin/"); ok {
+			return branch, nil
+		}
+		return target, nil
+	}
+
+	// Fallback: try main, then master
+	for _, branch := range []string{"main", "master"} {
+		_, err := repo.Reference(plumbing.ReferenceName("refs/heads/"+branch), false)
+		if err == nil {
+			return branch, nil
+		}
+	}
+
+	return "", fmt.Errorf("cannot detect default branch")
+}
+
+// createTempWorktree creates a temporary git worktree checked out at the given ref.
+func createTempWorktree(repoPath, ref string) (string, error) {
+	tmpDir, err := os.MkdirTemp("", "gobreaker-*")
+	if err != nil {
+		return "", fmt.Errorf("failed to create temp dir: %w", err)
+	}
+
+	cmd := exec.Command("git", "-C", repoPath, "worktree", "add", "--detach", tmpDir, ref)
+	if out, err := cmd.CombinedOutput(); err != nil {
+		os.RemoveAll(tmpDir)
+		return "", fmt.Errorf("failed to create worktree for %q: %s: %w", ref, strings.TrimSpace(string(out)), err)
+	}
+
+	return tmpDir, nil
+}
+
+// removeTempWorktree removes a temporary git worktree.
+func removeTempWorktree(repoPath, worktreePath string) {
+	exec.Command("git", "-C", repoPath, "worktree", "remove", "--force", worktreePath).Run()
+	os.RemoveAll(worktreePath)
+}
+
+// OpenRepo compares API differences between git refs in a repository.
+// If newRef is empty, compares oldRef against the current working directory.
+func OpenRepo(repoPath, oldRef, newRef string, includeInternal bool) (*breaking.Diff, error) {
+	oldDir, err := createTempWorktree(repoPath, oldRef)
+	if err != nil {
+		return nil, fmt.Errorf("failed to prepare old ref: %w", err)
+	}
+	defer removeTempWorktree(repoPath, oldDir)
+
+	newDir := repoPath
+	if newRef != "" {
+		newDir, err = createTempWorktree(repoPath, newRef)
+		if err != nil {
+			return nil, fmt.Errorf("failed to prepare new ref: %w", err)
+		}
+		defer removeTempWorktree(repoPath, newDir)
+	}
+
+	return CompareFilesystems(oldDir, newDir, includeInternal)
 }
