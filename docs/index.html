@@ -3,451 +3,145 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="theme-color" content="#b8b5af" media="(prefers-color-scheme: light)" />
-    <meta name="theme-color" content="#1a1815" media="(prefers-color-scheme: dark)" />
-
-    <!-- iOS Safari UI tinting -->
-    <meta name="apple-mobile-web-app-capable" content="yes" />
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-    <meta name="apple-mobile-web-app-title" content="gobreaker" />
-    <title>gobreaker - Breaking Change Detection for Go APIs</title>
-    <link
-      rel="stylesheet"
-      href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css"
-    />
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link
-      href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&display=swap"
-      rel="stylesheet"
-    />
+    <meta name="theme-color" content="#fdfdfc" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#161412" media="(prefers-color-scheme: dark)" />
+    <title>gobreaker — Breaking Change Detection for Go APIs</title>
     <link rel="stylesheet" href="styles.css" />
   </head>
   <body>
-    <div class="terminal-window">
-      <div class="terminal-header">
-        <div class="terminal-controls">
-          <div class="control close"></div>
-          <div class="control minimize"></div>
-          <div class="control maximize"></div>
+    <div class="page">
+
+      <!-- Hero -->
+      <header class="hero">
+        <div class="hero-title">
+          <img src="gobreaker.png" alt="gobreaker logo" width="320" height="320" />
+          <h1>gobreaker</h1>
         </div>
-        <div class="terminal-tabs">
-          <div class="tab active" data-tab="about">About</div>
-          <div class="tab" data-tab="install">Install</div>
-          <div class="tab" data-tab="usage">Usage</div>
-          <div class="tab" data-tab="features">Features</div>
-          <div class="tab" data-tab="examples">Examples</div>
-          <div class="tab" data-tab="changelog">Changelog</div>
-        </div>
-      </div>
+        <p class="tagline">Detect breaking changes in Go APIs before they ship.</p>
+      </header>
 
-      <div class="terminal-content">
-        <div class="tab-content active" id="about">
-          <div class="ascii-header">
-            <pre>
-   __ _  ___  ___ _ __ ___  __ _| | _____ _ __
-  / _` |/ _ \| _ \ '__/ _ \/ _` | |/ / _ \ '__|
- | (_| | (_) |  _/ | |  __/ (_| |   <  __/ |
-  \__, |\___/|_| |_|  \___|\__,_|_|\_\___|_|
-  |___/
-</pre
-            >
-          </div>
+      <!-- Install -->
+      <section>
+        <h2>Install</h2>
+        <div class="code-block"><pre><code>go install github.com/flaticols/gobreaker/cmd/gobreaker@latest</code></pre></div>
+        <p>Or via Homebrew:</p>
+        <div class="code-block"><pre><code>brew tap flaticols/apps
+brew install flaticols/apps/gobreaker</code></pre></div>
+        <p>Or build from source:</p>
+        <div class="code-block"><pre><code>git clone https://github.com/flaticols/gobreaker.git
+cd gobreaker
+go build -o gobreaker ./cmd/gobreaker</code></pre></div>
+      </section>
 
-          <div class="prompt">
-            <span class="prompt-symbol">gobreaker@v0.1.0:~$</span> <span class="command">gobreaker --help</span>
-          </div>
+      <!-- Usage -->
+      <section>
+        <h2>Usage</h2>
+        <div class="code-block"><pre><code><span class="comment"># Compare a tag against current working tree</span>
+gobreaker v1.0.0
 
-          <div class="output">
-            <pre>
-gobreaker - Breaking Change Detection for Go APIs
+<span class="comment"># Compare two git refs</span>
+gobreaker v1.0.0 v2.0.0
 
-Gobreaker is a Go tool that helps you detect breaking changes in Go APIs using
-the golang.org/x/exp/apidiff package. It analyzes Go packages and reports
-incompatible changes between versions, helping you maintain API stability and
-follow semantic versioning principles.
+<span class="comment"># Compare filesystem paths</span>
+gobreaker -p /old/pkg /new/pkg
 
-USAGE:
-    gobreaker --old [ref] [OPTIONS]
+<span class="comment"># Include internal packages</span>
+gobreaker -i v1.0.0</code></pre></div>
 
-For more information, see other tabs or visit:
-https://github.com/flaticols/gobreaker</pre
-            >
-          </div>
+        <table class="flags-table">
+          <thead>
+            <tr><th>Flag</th><th>Description</th></tr>
+          </thead>
+          <tbody>
+            <tr><td>-p, --path</td><td>Interpret arguments as filesystem paths instead of git refs</td></tr>
+            <tr><td>-i, --include-internal</td><td>Include internal packages in API analysis</td></tr>
+            <tr><td>-r, --repo &lt;path&gt;</td><td>Path to git repository (default: current directory)</td></tr>
+            <tr><td>-f, --format &lt;fmt&gt;</td><td>Output format: text (default)</td></tr>
+            <tr><td>-q, --quiet</td><td>Suppress output</td></tr>
+            <tr><td>-v, --version</td><td>Print version information</td></tr>
+          </tbody>
+        </table>
 
-          <div class="prompt">
-            <span class="prompt-symbol">gobreaker@v0.1.0:~$</span>
-            <span class="command">gobreaker --old v1.0.0 --new v1.1.0</span>
-          </div>
+        <p>Exit code <strong>1</strong> when breaking changes are detected — ready for CI/CD pipelines.</p>
+      </section>
 
-          <div class="output">
-            <pre><span class="success">•</span> analyzing repository: ./
-<span class="success">•</span> comparing v1.0.0 -> v1.1.0
-<span class="warning">•</span> found <span class="error">2 incompatible</span> changes
-<span class="success">•</span> found <span class="success">5 compatible</span> changes
-
-Incompatible changes:
-  - Removed: func OldFunction()
-  - Changed: type Config field Name: changed from string to []string
-
-<span class="error">•</span> breaking changes detected (exit code: 1)</pre>
+      <!-- Features -->
+      <section>
+        <h2>Features</h2>
+        <div class="features-grid">
+          <div class="feature-card">
+            <h3>Accurate detection</h3>
+            <p>Powered by <code>golang.org/x/exp/apidiff</code> — the same engine the Go team uses.</p>
           </div>
-        </div>
-
-        <div class="tab-content" id="install">
-          <div class="section-header">Installation</div>
-
-          <div class="prompt">
-            <span class="prompt-symbol">gobreaker@v0.1.0:~$</span>
-            <span class="comment"># Install using Homebrew</span>
+          <div class="feature-card">
+            <h3>Git-native</h3>
+            <p>Compare any two refs — tags, branches, or commits — directly in your repository.</p>
           </div>
-          <div class="prompt">
-            <span class="prompt-symbol">gobreaker@v0.1.0:~$</span>
-            <span class="command">brew tap flaticols/apps</span>
+          <div class="feature-card">
+            <h3>Filesystem mode</h3>
+            <p>Compare two directories on disk when git isn't involved.</p>
           </div>
-          <div class="prompt">
-            <span class="prompt-symbol">gobreaker@v0.1.0:~$</span>
-            <span class="command">brew install flaticols/apps/gobreaker</span>
+          <div class="feature-card">
+            <h3>CI/CD ready</h3>
+            <p>Non-zero exit code on breaking changes. Drop it into any pipeline.</p>
           </div>
-
-          <div class="output">
-            <pre><span class="success">•</span> Tapping flaticols/apps
-<span class="success">•</span> Installing gobreaker from flaticols/apps
-<span class="success">•</span> gobreaker 0.1.0 is installed</pre>
+          <div class="feature-card">
+            <h3>Internal filtering</h3>
+            <p>Skips <code>internal/</code> packages by default. Pass <code>-i</code> to include them.</p>
           </div>
-
-          <div class="prompt">
-            <span class="prompt-symbol">gobreaker@v0.1.0:~$</span> <span class="comment"># Or install using Go</span>
-          </div>
-          <div class="prompt">
-            <span class="prompt-symbol">gobreaker@v0.1.0:~$</span>
-            <span class="command">go install github.com/flaticols/gobreaker@latest</span>
-          </div>
-
-          <div class="output">
-            <pre>go: downloading github.com/flaticols/gobreaker v0.1.0
-<span class="success">•</span> Successfully installed gobreaker</pre>
-          </div>
-
-          <div class="prompt">
-            <span class="prompt-symbol">gobreaker@v0.1.0:~$</span> <span class="comment"># Or build from source</span>
-          </div>
-          <div class="prompt">
-            <span class="prompt-symbol">gobreaker@v0.1.0:~$</span>
-            <span class="command">git clone https://github.com/flaticols/gobreaker.git</span>
-          </div>
-          <div class="prompt">
-            <span class="prompt-symbol">gobreaker@v0.1.0:~$</span> <span class="command">cd gobreaker</span>
-          </div>
-          <div class="prompt">
-            <span class="prompt-symbol">gobreaker@v0.1.0:~$</span>
-            <span class="command">go build -o gobreaker ./cmd/gobreaker</span>
-          </div>
-
-          <div class="prompt">
-            <span class="prompt-symbol">gobreaker@v0.1.0:~$</span> <span class="comment"># Download binary releases from:</span>
-          </div>
-          <div class="output">
-            <pre><a href="https://github.com/flaticols/gobreaker/releases">https://github.com/flaticols/gobreaker/releases</a></pre>
+          <div class="feature-card">
+            <h3>Zero config</h3>
+            <p>Point it at a repo and a ref. No configuration files needed.</p>
           </div>
         </div>
+      </section>
 
-        <div class="tab-content" id="usage">
-          <div class="section-header">Usage</div>
+      <!-- What it detects -->
+      <section>
+        <h2>What it detects</h2>
+        <ul class="detect-list">
+          <li>Removed or renamed exported functions, types, methods, and variables</li>
+          <li>Changed function or method signatures</li>
+          <li>Removed or modified struct fields</li>
+          <li>Interface method additions or changes</li>
+          <li>Type definition changes (e.g. <code>string</code> to <code>[]string</code>)</li>
+          <li>Compatible additions — new exports that don't break existing callers</li>
+        </ul>
+      </section>
 
-          <div class="prompt">
-            <span class="prompt-symbol">gobreaker@v0.1.0:~$</span> <span class="command">gobreaker --help</span>
-          </div>
+      <!-- Claude Code plugin -->
+      <section>
+        <h2>Claude Code plugin</h2>
+        <p>gobreaker is available as a <a href="https://github.com/flaticols/gobreaker">Claude Code</a> plugin for AI-assisted breaking-change detection.</p>
 
-          <div class="output">
-            <pre>
-USAGE:
-    gobreaker [OPTIONS]
+        <div class="code-block"><pre><code><span class="comment"># Install from marketplace</span>
+/plugin marketplace add flaticols/gobreaker
+/plugin install gobreaker</code></pre></div>
 
-OPTIONS:
-    -r, --repo       Path to git repository (default: current directory)
-    -o, --old        Old reference (branch, tag, or commit) to compare from,
-                     or 'latest' to compare latest against HEAD (required)
-    -n, --new        New reference (branch, tag, or commit) to compare to (default: HEAD)
-    -f, --format     Output format (text, json, markdown) (default: text)
-    -q, --quiet      Suppress output
-    -v, --version    Print version information and exit
-    -h, --help       Show help message
+        <div class="code-block"><pre><code><span class="comment"># Compare default branch vs working directory</span>
+/gobreaker:check
 
-EXIT CODES:
-    0 - No breaking changes detected
-    1 - Breaking changes found
+<span class="comment"># Compare a specific tag</span>
+/gobreaker:check v0.0.1
 
-EXAMPLES:
-    # Compare latest tag against HEAD in current directory
-    gobreaker --old latest
+<span class="comment"># Compare two refs</span>
+/gobreaker:check v0.0.1 v0.0.2
 
-    # Compare two tags in a specific repository
-    gobreaker --repo /path/to/repo --old v1.0.0 --new v2.0.0
+<span class="comment"># Compare filesystem paths</span>
+/gobreaker:check -p /old/pkg /new/pkg</code></pre></div>
 
-    # Compare specific commits
-    gobreaker --old abc123 --new def456
-
-    # Compare branch against tag with quiet mode
-    gobreaker --old v1.0.0 --new feature-branch --quiet
-
-    # Check breaking changes from main branch
-    gobreaker --old main --new HEAD</pre
-            >
-          </div>
+        <div class="plugin-note">
+          <p>The <code>gobreaker</code> binary must be in your <code>PATH</code>.</p>
+          <p>The skill returns a structured summary with compatible/breaking status, semver bump recommendation, and migration hints.</p>
         </div>
+      </section>
 
-        <div class="tab-content" id="features">
-          <div class="section-header">Features</div>
+      <!-- Footer -->
+      <footer class="footer">
+        <span><a href="https://github.com/flaticols/gobreaker">GitHub</a></span>
+        <span>Apache 2.0 License &middot; <a href="https://github.com/flaticols">Denis Panfilov</a></span>
+      </footer>
 
-          <div class="feature-list">
-            <div class="feature-item">
-              <span class="feature-icon">▸</span>
-              <span class="feature-name">API Analysis</span>
-              <span class="feature-desc"
-                >Powered by golang.org/x/exp/apidiff for accurate breaking change detection</span
-              >
-            </div>
-
-            <div class="feature-item">
-              <span class="feature-icon">▸</span>
-              <span class="feature-name">Git Reference Compare</span>
-              <span class="feature-desc"
-                >Compare any two git references: tags, branches, or commits in a repository</span
-              >
-            </div>
-
-            <div class="feature-item">
-              <span class="feature-icon">▸</span>
-              <span class="feature-name">Breaking Changes</span>
-              <span class="feature-desc"
-                >Identifies removed functions, changed signatures, and incompatible changes</span
-              >
-            </div>
-
-            <div class="feature-item">
-              <span class="feature-icon">▸</span>
-              <span class="feature-name">Safe Changes</span>
-              <span class="feature-desc"
-                >Reports compatible additions and improvements to your API</span
-              >
-            </div>
-
-            <div class="feature-item">
-              <span class="feature-icon">▸</span>
-              <span class="feature-name">Text Output</span>
-              <span class="feature-desc">Clear text-based reports with proper categorization</span>
-            </div>
-
-            <div class="feature-item">
-              <span class="feature-icon">▸</span>
-              <span class="feature-name">Clear Reports</span>
-              <span class="feature-desc"
-                >Well-formatted output with proper indentation and categorization</span
-              >
-            </div>
-
-            <div class="feature-item">
-              <span class="feature-icon">▸</span>
-              <span class="feature-name">Latest Tag Support</span>
-              <span class="feature-desc"
-                >Special 'latest' reference to automatically compare against the most recent tag</span
-              >
-            </div>
-
-            <div class="feature-item">
-              <span class="feature-icon">▸</span>
-              <span class="feature-name">CI/CD Ready</span>
-              <span class="feature-desc"
-                >Exit codes and structured output perfect for automated pipelines</span
-              >
-            </div>
-          </div>
-        </div>
-
-        <div class="tab-content" id="examples">
-          <div class="section-header">Examples</div>
-
-          <div class="example-section">
-            <div class="example-title">## Basic Repository Analysis</div>
-            <div class="prompt">
-              <span class="prompt-symbol">gobreaker@v0.1.0:~$</span>
-              <span class="command">gobreaker --old v1.0.0 --new v1.1.0</span>
-            </div>
-            <div class="output">
-              <pre><span class="success">•</span> analyzing repository: ./
-<span class="success">•</span> comparing v1.0.0 -> v1.1.0
-<span class="success">•</span> found 0 incompatible changes
-<span class="success">•</span> found 3 compatible changes
-
-Compatible changes:
-  + Added: func NewHelper(config Config) (*Helper, error)
-  + Added: method (*Client) GetTimeout() time.Duration
-  + Added: const DefaultTimeout
-
-<span class="success">•</span> no breaking changes detected</pre>
-            </div>
-          </div>
-
-          <div class="example-section">
-            <div class="example-title">## Detecting Breaking Changes</div>
-            <div class="prompt">
-              <span class="prompt-symbol">gobreaker@v0.1.0:~$</span>
-              <span class="command">gobreaker --old v1.0.0 --new v2.0.0</span>
-            </div>
-            <div class="output">
-              <pre><span class="success">•</span> analyzing repository: ./
-<span class="success">•</span> comparing v1.0.0 -> v2.0.0
-<span class="warning">•</span> found <span class="error">3 incompatible</span> changes
-<span class="success">•</span> found <span class="success">5 compatible</span> changes
-
-Incompatible changes:
-  - Removed: func DeprecatedFunction(s string) error
-  - Changed: func Process(input string) error
-      to: func Process(ctx context.Context, input string) error
-  - Changed: type Config field Timeout: changed from int to time.Duration
-
-Compatible changes:
-  + Added: func ProcessWithContext(ctx context.Context, input string) error
-  + Added: method (*Client) Close() error
-  + Added: field Config.MaxRetries int
-  + Added: var ErrTimeout = errors.New("operation timed out")
-  + Added: interface Processor
-
-<span class="error">•</span> breaking changes detected (exit code: 1)</pre>
-            </div>
-          </div>
-
-          <div class="example-section">
-            <div class="example-title">## Compare Latest Tag with HEAD</div>
-            <div class="prompt">
-              <span class="prompt-symbol">gobreaker@v0.1.0:~$</span>
-              <span class="command"
-                >gobreaker --old latest</span
-              >
-            </div>
-            <div class="output">
-              <pre><span class="success">•</span> analyzing repository: ./
-<span class="success">•</span> comparing v0.1.0 -> HEAD
-<span class="success">•</span> found 0 incompatible changes
-<span class="success">•</span> found 2 compatible changes
-
-Compatible changes:
-  + Added: func ValidateRequest(r *Request) error
-  + Added: const MaxRetries = 3
-
-<span class="success">•</span> no breaking changes detected</pre
-              >
-            </div>
-          </div>
-
-          <div class="example-section">
-            <div class="example-title">## CI/CD Integration</div>
-            <div class="prompt">
-              <span class="prompt-symbol">gobreaker@v0.1.0:~$</span>
-              <span class="comment"># In your CI/CD pipeline</span>
-            </div>
-            <div class="prompt">
-              <span class="prompt-symbol">gobreaker@v0.1.0:~$</span>
-              <span class="command">gobreaker --repo ./api --old v1.5.0 --new HEAD || {</span>
-            </div>
-            <div class="prompt">
-              <span class="prompt-symbol">></span>
-              <span class="command">
-                echo "Breaking changes detected! Major version bump required."</span
-              >
-            </div>
-            <div class="prompt">
-              <span class="prompt-symbol">></span> <span class="command"> exit 1</span>
-            </div>
-            <div class="prompt">
-              <span class="prompt-symbol">></span> <span class="command">}</span>
-            </div>
-            <div class="output">
-              <pre><span class="success">•</span> analyzing repository: ./api
-<span class="success">•</span> comparing v1.5.0 -> HEAD
-<span class="success">•</span> found 0 incompatible changes
-<span class="success">•</span> found 2 compatible changes
-<span class="success">•</span> no breaking changes detected</pre>
-            </div>
-          </div>
-        </div>
-
-        <div class="tab-content" id="changelog">
-          <div class="section-header">Changelog</div>
-
-          <div class="changelog-entry">
-            <div class="changelog-version">
-              <span class="version-tag">v0.1.0</span>
-              <span class="version-date">Initial Release</span>
-            </div>
-            <div class="changelog-changes">
-              <div class="change-type added">Added</div>
-              <ul>
-                <li>Core breaking change detection using golang.org/x/exp/apidiff</li>
-                <li>Support for comparing Go packages between versions, commits, or branches</li>
-                <li>Multiple output formats: text, JSON, and Markdown</li>
-                <li>Git integration for analyzing repository changes</li>
-                <li>Detailed reporting of both compatible and incompatible changes</li>
-                <li>CLI with comprehensive flags for different use cases</li>
-                <li>Exit codes for CI/CD integration</li>
-                <li>Custom diff report writer with proper indentation</li>
-              </ul>
-            </div>
-          </div>
-
-          <div class="changelog-footer">
-            <p>
-              For the latest updates, visit the
-              <a href="https://github.com/flaticols/gobreaker">GitHub repository</a>
-            </p>
-          </div>
-        </div>
-      </div>
-
-      <div class="terminal-footer">
-        <div class="footer-left">
-          <a href="https://github.com/flaticols/gobreaker">
-            <i class="fab fa-github"></i> GitHub
-          </a>
-          <a href="https://github.com/flaticols/gobreaker/issues">
-            <i class="fas fa-bug"></i> Issues
-          </a>
-        </div>
-        <div class="footer-right">
-          gobreaker © 2025 by <a href="https://github.com/flaticols">Denis Panfilov</a> | MIT
-          License
-        </div>
-      </div>
     </div>
-
-    <script>
-      // Tab switching functionality
-      document.addEventListener("DOMContentLoaded", function () {
-        const tabs = document.querySelectorAll(".tab");
-        const contents = document.querySelectorAll(".tab-content");
-
-        tabs.forEach((tab) => {
-          tab.addEventListener("click", () => {
-            // Remove active class from all tabs and contents
-            tabs.forEach((t) => t.classList.remove("active"));
-            contents.forEach((c) => c.classList.remove("active"));
-
-            // Add active class to clicked tab
-            tab.classList.add("active");
-
-            // Show corresponding content
-            const tabName = tab.getAttribute("data-tab");
-            document.getElementById(tabName).classList.add("active");
-          });
-        });
-
-        // Terminal typing effect for commands (optional)
-        const commands = document.querySelectorAll(".command");
-        commands.forEach((cmd) => {
-          cmd.style.opacity = "1";
-        });
-      });
-    </script>
   </body>
 </html>
