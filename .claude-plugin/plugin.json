@@ -6,9 +6,6 @@
     "name": "flaticols"
   },
   "homepage": "https://github.com/flaticols/gobreaker",
-  "repository": {
-    "type": "git",
-    "url": "https://github.com/flaticols/gobreaker"
-  },
+  "repository": "https://github.com/flaticols/gobreaker",
   "license": "MIT"
 }
